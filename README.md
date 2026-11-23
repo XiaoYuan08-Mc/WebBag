@@ -6,7 +6,7 @@ Purpur / Paper 26.3 的插件，用浏览器看服务器上在线玩家的背包
 
 ## 安装
 
-把 `WebBag-1.3.0.jar` 丢进 `plugins/`，重启。游戏里敲 `/webbag link`，聊天栏会给一条带口令的网址，浏览器打开就能看，左边是在线玩家列表，点谁看谁。
+把 `WebBag-1.3.1.jar` 丢进 `plugins/`，重启。游戏里敲 `/webbag link`，聊天栏会给一条带口令的网址，浏览器打开就能看，左边是在线玩家列表，点谁看谁。
 
 口令第一次访问后存在 Cookie 里（30 天），之后直接 `http://服务器IP:5001` 就行。口令自动生成在 `plugins/WebBag/config.yml`。
 

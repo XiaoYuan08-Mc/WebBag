@@ -7,15 +7,12 @@
 <title>网页背包</title>
 <style>
   :root{
-    --bg:#0f1115;
-    --panel:#171a1f;
-    --panel-2:#1d2128;
-    --line:#2a3038;
-    --text:#e6e9ee;
-    --muted:#8b95a5;
-    --accent:#4c9aff;
-    --ok:#3fb950;
-    --bad:#f85149;
+    --bg:#111315;
+    --panel:#181a1c;
+    --panel-2:#1e2023;
+    --line:#2a2d31;
+    --text:#e8e8e8;
+    --muted:#8b9096;
     --cell:52px;
     --gap:4px;
   }
@@ -34,20 +31,19 @@
     background:var(--panel);border-bottom:1px solid var(--line);
     position:sticky;top:0;z-index:10;
   }
-  .brand{font-size:16px;font-weight:600}
-  .top .sub{font-size:12px;color:var(--muted)}
+  .brand{font-size:15px;font-weight:600;letter-spacing:.02em}
   .top .grow{flex:1}
   .top .online{font-size:12.5px;color:var(--muted)}
   .top .status{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
-  .top .status i{width:7px;height:7px;border-radius:50%;background:var(--muted)}
-  .top .status.ok i{background:var(--ok)}
-  .top .status.bad i{background:var(--bad)}
+  .top .status i{width:6px;height:6px;border-radius:50%;background:#4a4e53}
+  .top .status.ok i{background:#a8adb3}
+  .top .status.bad i{background:#4a4e53}
   .btn{
     font:inherit;font-size:13px;color:var(--text);
-    background:var(--panel-2);border:1px solid var(--line);
+    background:transparent;border:1px solid var(--line);
     border-radius:6px;padding:6px 14px;cursor:pointer;
   }
-  .btn:hover{border-color:#3a424e}
+  .btn:hover{background:var(--panel-2);border-color:#3a3e43}
   .btn:disabled{opacity:.6;cursor:default}
 
   /* 布局 */
@@ -70,15 +66,15 @@
   .prow{
     display:flex;align-items:center;gap:9px;
     padding:7px 8px;border-radius:6px;cursor:pointer;
-    border-left:2px solid transparent;
   }
-  .prow:hover{background:#20252d}
-  .prow.active{background:#20252d;border-left-color:var(--accent)}
-  .prow img{width:26px;height:26px;border-radius:4px;image-rendering:pixelated;background:#242a33}
+  .prow:hover{background:var(--panel-2)}
+  .prow.active{background:var(--panel-2)}
+  .prow.active .name{font-weight:600}
+  .prow img{width:26px;height:26px;border-radius:4px;image-rendering:pixelated;background:#232528}
   .prow .letter{
     width:26px;height:26px;border-radius:4px;display:none;
     align-items:center;justify-content:center;
-    background:#242a33;color:#b8c2d0;font-size:12px;font-weight:600
+    background:#232528;color:var(--muted);font-size:12px;font-weight:600
   }
   .prow .info{min-width:0}
   .prow .name{
@@ -98,7 +94,7 @@
   }
   .avatar{
     width:40px;height:40px;border-radius:6px;image-rendering:pixelated;
-    background:#242a33;flex:none;
+    background:#232528;flex:none;
   }
   .who{min-width:0}
   .who h2{font-size:15px;font-weight:600;line-height:1.3}
@@ -119,12 +115,12 @@
     padding:8px 10px;margin-bottom:-1px;cursor:pointer;
   }
   .tab:hover{color:var(--text)}
-  .tab.active{color:var(--text);border-bottom-color:var(--accent)}
+  .tab.active{color:var(--text);border-bottom-color:#d8dadd}
   .tab[hidden]{display:none}
 
   .notice{
     display:none;padding:9px 20px;font-size:12.5px;
-    color:#ffd7a8;background:#2a2218;border-bottom:1px solid #3d3120;
+    color:var(--muted);background:#1b1d1f;border-bottom:1px solid var(--line);
   }
   .notice.show{display:block}
 
@@ -146,19 +142,19 @@
 
   .cell{
     width:var(--cell);height:var(--cell);border-radius:5px;
-    background:#21262e;border:1px solid #333a44;
+    background:#1e2124;border:1px solid #2e3237;
     position:relative;display:grid;place-items:center;
   }
-  .cell.empty{background:#1b1f25;border-color:#262c34}
-  .cell.filled:hover{border-color:var(--accent)}
-  .cell .hint{font-size:11px;color:#5b6675}
-  .cell.ench{box-shadow:inset 0 0 0 1px rgba(167,139,250,.45)}
+  .cell.empty{background:#191c1f;border-color:#25292d}
+  .cell.filled:hover{border-color:#4a4f55}
+  .cell .hint{font-size:11px;color:#5a6067}
+  .cell.ench{box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
 
   .icon{width:38px;height:38px;position:relative}
   .icon img{width:100%;height:100%;object-fit:contain;image-rendering:pixelated}
   .icon .fallback{
     display:none;width:100%;height:100%;border-radius:4px;
-    place-items:center;background:#2d333d;color:#c7d0dc;font-size:13px;font-weight:600;
+    place-items:center;background:#282b2f;color:var(--muted);font-size:13px;font-weight:600;
   }
   .count{
     position:absolute;right:3px;bottom:1px;font-size:11px;font-weight:600;color:#fff;
@@ -166,9 +162,9 @@
   }
   .dura{
     position:absolute;left:4px;right:4px;bottom:3px;height:2px;
-    background:rgba(0,0,0,.6);border-radius:1px;overflow:hidden;pointer-events:none;
+    background:rgba(0,0,0,.55);border-radius:1px;overflow:hidden;pointer-events:none;
   }
-  .dura i{display:block;height:100%}
+  .dura i{display:block;height:100%;background:#b7bcc1}
 
   .panel-foot{
     display:flex;justify-content:space-between;gap:12px;
@@ -182,16 +178,16 @@
   .tip{
     position:fixed;z-index:40;pointer-events:none;opacity:0;
     max-width:260px;padding:8px 10px;border-radius:6px;
-    background:#0c0f13;border:1px solid #3a424e;
+    background:#0e1012;border:1px solid #34383d;
     box-shadow:0 8px 24px rgba(0,0,0,.5);
     font-size:12.5px;line-height:1.55;
   }
   .tip.show{opacity:1}
-  .tip .name{color:#f2f5f9;font-weight:600}
-  .tip .lore{color:#b18cf0}
-  .tip .ench{color:#7cc0f5}
+  .tip .name{color:#fff;font-weight:600}
+  .tip .lore{color:#c3c7cc}
+  .tip .ench{color:#a9aeb4}
   .tip .dura{color:var(--muted)}
-  .tip .id{color:#5f6b7b;font-size:11px;margin-top:4px}
+  .tip .id{color:#6a7076;font-size:11px;margin-top:4px}
 
   /* 浮层 */
   .overlay{
@@ -208,8 +204,8 @@
   .modal p{font-size:13px;color:var(--muted);line-height:1.7}
   .modal code{
     display:block;margin-top:12px;padding:8px 10px;border-radius:6px;
-    background:#0c0f13;border:1px solid #2a3038;
-    font-family:ui-monospace,Consolas,monospace;font-size:13px;color:#9ad19f;
+    background:#0e1012;border:1px solid var(--line);
+    font-family:ui-monospace,Consolas,monospace;font-size:13px;color:#cfd3d7;
   }
 
   @media (max-width:860px){
@@ -217,8 +213,8 @@
     .layout{grid-template-columns:1fr;padding:14px 12px}
     .players{max-height:none}
     .players ul{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
-    .prow{flex:none;border-left:none;border-bottom:2px solid transparent}
-    .prow.active{border-left:none;border-bottom-color:var(--accent)}
+    .prow{flex:none}
+    .prow.active{border-bottom:2px solid #d8dadd}
     .panel-head{flex-wrap:wrap}
     .stats{margin-left:0;width:100%;text-align:left}
     .icon{width:32px;height:32px}
@@ -234,7 +230,6 @@
 
 <header class="top">
   <div class="brand">网页背包</div>
-  <div class="sub">只读查看</div>
   <div class="grow"></div>
   <div class="online" id="online">在线 0 人</div>
   <div class="status" id="status"><i></i><span>连接中</span></div>
@@ -744,7 +739,7 @@ window.WB_CFG = {
           bar.className = "dura";
           const fill = document.createElement("i");
           fill.style.width = (left * 100).toFixed(1) + "%";
-          fill.style.background = left > 0.5 ? "#3fb950" : left > 0.2 ? "#d29922" : "#f85149";
+          fill.style.opacity = left > 0.5 ? "1" : left > 0.2 ? ".75" : ".5";
           bar.appendChild(fill);
           cell.appendChild(bar);
         }
