@@ -420,8 +420,10 @@ public final class WebBagPlugin extends JavaPlugin {
         try {
             String json = Snapshot.sample();
             getLogger().info("Self-test snapshot: " + json);
-            sender.sendMessage(Component.text("自检通过，JSON 长度 " + json.length() + " 字节，详情见控制台。",
-                    NamedTextColor.GREEN));
+            String coverage = Textures.coverage();
+            getLogger().info("Self-test icon coverage: " + coverage);
+            sender.sendMessage(Component.text("自检通过，JSON 长度 " + json.length() + " 字节。", NamedTextColor.GREEN));
+            sender.sendMessage(Component.text("图标覆盖：" + coverage, NamedTextColor.GRAY));
         } catch (Throwable t) {
             getLogger().severe("Self-test failed: " + t);
             sender.sendMessage(Component.text("自检失败：" + t.getMessage(), NamedTextColor.RED));

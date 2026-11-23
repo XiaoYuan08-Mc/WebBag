@@ -840,7 +840,6 @@ window.WB_CFG = {
     wrap.className = "icon";
     const img = document.createElement("img");
     img.alt = itemName(item);
-    img.loading = "lazy";
     img.referrerPolicy = "no-referrer";
 
     const fallback = document.createElement("div");
@@ -872,9 +871,12 @@ window.WB_CFG = {
   }
 
   function setAvatar(img, uuid, name, px, onFail) {
+    const id = encodeURIComponent(name || uuid);
     const sources = [
       api(`api/skin?player=${encodeURIComponent(uuid)}`),
-      `https://mc-heads.net/avatar/${encodeURIComponent(name || uuid)}/${px}`
+      `https://mc-heads.net/avatar/${id}/${px}`,
+      `https://crafatar.com/avatars/${encodeURIComponent(uuid)}?size=${px}&overlay`,
+      `https://minotar.net/helm/${id}/${px}.png`
     ];
     let idx = 0;
     img.loading = "lazy";

@@ -62,6 +62,11 @@ final class Textures {
 
     /** 自检：jar 内贴图是否加载、某个物品能不能取到图。 */
     static String diag(String key) {
+        return diag(key, false);
+    }
+
+    /** full=true 时把全部缺失的 Material 列出来。 */
+    static String diag(String key, boolean full) {
         Textures t = instance;
         if (t == null) {
             return "{\"bundle\":0,\"loaded\":false}";
@@ -71,7 +76,62 @@ final class Textures {
         return "{\"bundle\":" + t.bundled.size()
                 + ",\"sampleKey\":\"" + (key == null || key.isBlank() ? "diamond_sword" : key) + "\""
                 + ",\"sampleBytes\":" + (uri == null ? 0 : uri.length())
+                + ",\"coverage\":" + coverage(full ? 0 : 15)
                 + "}";
+    }
+
+    /** 全量覆盖统计：所有可成图的 Material 里有多少能取到贴图，缺哪些。 */
+    static String coverage() {
+        return coverage(15);
+    }
+
+    /** sample 为 0 时列出全部缺失项，方便排查。 */
+    static String coverage(int sample) {
+        Textures t = instance;
+        if (t == null) {
+            return "{\"materials\":0,\"withIcon\":0,\"missing\":0,\"missingSample\":[]}";
+        }
+        t.loadBundle();
+        int total = 0;
+        int ok = 0;
+        int missing = 0;
+        StringBuilder sampleOut = new StringBuilder();
+        for (org.bukkit.Material material : org.bukkit.Material.values()) {
+            if (material.isAir() || material.isLegacy()) {
+                continue;
+            }
+            String key = material.getKey().getKey();
+            if (key == null || key.isBlank()) {
+                continue;
+            }
+            total++;
+            if (t.has(key)) {
+                ok++;
+                continue;
+            }
+            missing++;
+            if (sample <= 0 || missing <= sample) {
+                if (sampleOut.length() > 0) {
+                    sampleOut.append(',');
+                }
+                sampleOut.append('"').append(key).append('"');
+            }
+        }
+        return "{\"materials\":" + total + ",\"withIcon\":" + ok + ",\"missing\":" + missing
+                + ",\"missingSample\":[" + sampleOut + "]}";
+    }
+
+    /** 只看 jar 包里有没有这张图，不生成 data URI（自检用，避免缓存一堆 base64）。 */
+    private boolean has(String key) {
+        if (!validKey(key)) {
+            return false;
+        }
+        for (String relative : candidates(key)) {
+            if (fromBundle(relative) != null) {
+                return true;
+            }
+        }
+        return false;
     }
 
     Textures(WebBagPlugin plugin) {
@@ -178,7 +238,9 @@ final class Textures {
             "chest", "entity/chest/normal.png",
             "trapped_chest", "entity/chest/trapped.png",
             "ender_chest", "entity/chest/ender.png",
-            "shield", "entity/shield/base.png"
+            "shield", "entity/shield/base.png",
+            "mushroom_block", "block/red_mushroom_block.png",
+            "grass_path", "block/dirt_path.png"
     );
 
     /** 同一个物品在不同版本里贴图文件名不一样，按可能性依次试。 */
@@ -194,21 +256,74 @@ final class Textures {
         if (key.endsWith("potion")) {
             list.add("item/potion.png");
         }
+        if (key.startsWith("enchanted_")) {
+            list.add("item/" + key.substring("enchanted_".length()) + ".png");
+        }
         list.add("item/" + key + ".png");
         list.add("block/" + key + ".png");
         list.add("block/" + key + "_side.png");
         list.add("block/" + key + "_top.png");
+        list.add("block/" + key + "_front.png");
+        list.add("block/" + key + "_front_on.png");
+        list.add("block/" + key + "_on.png");
+        list.add("block/" + key + "_bottom.png");
         list.add("item/" + key + "_front.png");
+        list.add("item/" + key + "_standby.png");
         list.add("item/" + key + "_00.png");
         if (key.endsWith("_wood")) {
             String alt = key.substring(0, key.length() - 5) + "_log";
             list.add("block/" + alt + ".png");
             list.add("block/" + alt + "_side.png");
         }
+        if (key.endsWith("_hyphae")) {
+            list.add("block/" + key.substring(0, key.length() - 6) + "_stem.png");
+        }
         if (key.endsWith("_sign")) {
             list.add("item/" + key.replace("_sign", "") + "_sign.png");
         }
+        // 台阶、楼梯、栅栏、墙这些在原版里是立体模型，没有平面贴图，
+        // 退一步用主方块（木板 / 羊毛 / 混凝土…）的贴图，总比空白好。
+        String base = strippedBase(key);
+        if (base != null) {
+            list.add("item/" + base + ".png");
+            list.add("block/" + base + ".png");
+            list.add("block/" + base + "_planks.png");
+            list.add("block/" + base + "_wool.png");
+            list.add("block/" + base + "s.png");
+            list.add("block/" + base + "_torch.png");
+        }
+        if (key.contains("_wall_")) {
+            list.add("block/" + key.replace("_wall_", "_") + ".png");
+        }
         return list;
+    }
+
+    private static final String[][] SUFFIX_BASE = {
+            {"_wall_hanging_sign", "_hanging_sign"},
+            {"_wall_sign", "_sign"},
+            {"_hanging_sign", ""},
+            {"_sign", ""},
+            {"_slab", ""},
+            {"_stairs", ""},
+            {"_wall", ""},
+            {"_fence_gate", ""},
+            {"_fence", ""},
+            {"_button", ""},
+            {"_pressure_plate", ""},
+            {"_carpet", "_wool"},
+            {"_bed", "_wool"},
+            {"_door", ""},
+            {"_trapdoor", ""}
+    };
+
+    /** 把 acacia_slab 之类的名字还原成主方块名 acacia。 */
+    private static String strippedBase(String key) {
+        for (String[] rule : SUFFIX_BASE) {
+            if (key.endsWith(rule[0])) {
+                return key.substring(0, key.length() - rule[0].length()) + rule[1];
+            }
+        }
+        return null;
     }
 
     /** 依次尝试的图源，第一个是配置里的，后面是备用镜像。 */

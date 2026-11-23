@@ -39,6 +39,11 @@ final class OfflineData {
                     Path dir = base.resolve(child);
                     if (Files.isDirectory(dir)) {
                         dirs.add(dir);
+                        // 26.3 的玩家档案实际放在 players/data 子目录里，两边都要扫
+                        Path nested = dir.resolve("data");
+                        if (Files.isDirectory(nested)) {
+                            dirs.add(nested);
+                        }
                     }
                 }
                 base = base.getParent();
@@ -116,7 +121,11 @@ final class OfflineData {
                     break;
                 }
                 String uuid = text.substring(uStart + 1, uEnd);
-                String name = nameBefore(text, idx);
+                // 不同服务端写的字段顺序不一样：有的先 name，有的先 uuid
+                String name = nameAfter(text, uEnd);
+                if (name == null) {
+                    name = nameBefore(text, idx);
+                }
                 if (!uuid.isBlank() && name != null) {
                     out.put(uuid, name);
                 }
@@ -126,6 +135,33 @@ final class OfflineData {
             // 读不到就当没有
         }
         return out;
+    }
+
+    /** 同一个对象里 uuid 之后紧跟着的 name。 */
+    private static String nameAfter(String text, int from) {
+        int nameIdx = text.indexOf("\"name\"", from);
+        if (nameIdx < 0) {
+            return null;
+        }
+        // 超出本条记录的范围就说明不是这个玩家的名字
+        int objEnd = text.indexOf('}', from);
+        if (objEnd >= 0 && nameIdx > objEnd) {
+            return null;
+        }
+        return valueAt(text, nameIdx);
+    }
+
+    private static String valueAt(String text, int keyIdx) {
+        int start = text.indexOf('"', text.indexOf(':', keyIdx) + 1);
+        if (start < 0) {
+            return null;
+        }
+        int end = text.indexOf('"', start + 1);
+        if (end < 0) {
+            return null;
+        }
+        String name = text.substring(start + 1, end);
+        return name.isBlank() ? null : name;
     }
 
     private static String nameBefore(String text, int before) {

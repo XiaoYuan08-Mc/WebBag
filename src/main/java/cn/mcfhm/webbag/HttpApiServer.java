@@ -46,6 +46,7 @@ public final class HttpApiServer {
     private volatile String pageHtml = "";
     private volatile String langCache;
     private final Map<String, RateWindow> rateWindows = new ConcurrentHashMap<>();
+    private final Map<String, RateWindow> assetWindows = new ConcurrentHashMap<>();
     private final Semaphore streamSlots = new Semaphore(16);
     private final Skins skins;
     private final Textures textures;
@@ -231,7 +232,7 @@ public final class HttpApiServer {
 
     /** 物品贴图：由服务端取并缓存，浏览器不直接访问外部 CDN。 */
     private void handleTexture(HttpExchange exchange) throws IOException {
-        if (!allow(ipOf(exchange))) {
+        if (!allowAsset(ipOf(exchange))) {
             respondJson(exchange, 429, errorJson("rate_limited", "请求过于频繁。"));
             return;
         }
@@ -275,7 +276,7 @@ public final class HttpApiServer {
             respondJson(exchange, 401, errorJson("invalid_key", "访问口令无效。"));
             return;
         }
-        String tex = Textures.diag(query.get("id"));
+        String tex = Textures.diag(query.get("id"), "1".equals(query.get("full")));
         String body = "{\"version\":\"" + plugin.getPluginMeta().getVersion()
                 + "\",\"textures\":" + tex + "}";
         respondJson(exchange, 200, body);
@@ -283,7 +284,7 @@ public final class HttpApiServer {
 
     /** 玩家当前皮肤的头像（64×64 PNG）。 */
     private void handleSkin(HttpExchange exchange) throws IOException {
-        if (!allow(ipOf(exchange))) {
+        if (!allowAsset(ipOf(exchange))) {
             respondJson(exchange, 429, errorJson("rate_limited", "请求过于频繁。"));
             return;
         }
@@ -529,16 +530,28 @@ public final class HttpApiServer {
     }
 
     private boolean allow(String ip) {
-        int limit = plugin.settings().rateLimitPerMinute();
+        return allow(ip, plugin.settings().rateLimitPerMinute(), rateWindows);
+    }
+
+    /**
+     * 贴图、头像这类静态资源单独计数。一个背包页面会连续取几十张图，
+     * 用接口那套限额容易把图标全打成 429（页面上就是一片空白）。
+     */
+    private boolean allowAsset(String ip) {
+        int limit = Math.max(600, plugin.settings().rateLimitPerMinute() * 12);
+        return allow(ip, limit, assetWindows);
+    }
+
+    private boolean allow(String ip, int limit, Map<String, RateWindow> windows) {
         long now = System.currentTimeMillis();
-        RateWindow window = rateWindows.compute(ip, (key, old) -> {
+        RateWindow window = windows.compute(ip, (key, old) -> {
             if (old == null || now - old.start() > 60_000L) {
                 return new RateWindow(now, 1);
             }
             return new RateWindow(old.start(), old.count() + 1);
         });
-        if (rateWindows.size() > 20_000) {
-            rateWindows.clear();
+        if (windows.size() > 20_000) {
+            windows.clear();
         }
         return window.count() <= limit;
     }

@@ -1,5 +1,5 @@
 name: WebBag
-version: '1.4.3'
+version: '1.5.0'
 main: cn.mcfhm.webbag.WebBagPlugin
 api-version: '26.3'
 description: 在浏览器查看全部玩家（含离线）的背包、装备与末影箱
