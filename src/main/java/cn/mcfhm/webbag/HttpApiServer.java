@@ -23,6 +23,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.regex.Pattern;
 
 /**
  * 内置 HTTP 服务。除 /health、/api/lang 外均需 access-key（可用 ?key= 或 Cookie）。
@@ -30,6 +31,10 @@ import java.util.concurrent.TimeoutException;
 public final class HttpApiServer {
 
     private static final String COOKIE_NAME = "webbag_key";
+    /** 预编译：SSE 每秒都要比对一次在线列表，别反复编译正则。 */
+    private static final Pattern TIME_FIELD = Pattern.compile("\"time\":\\d+,");
+    /** 所有 SSE 连接共用同一份在线列表，避免每条流每秒各打一次主线程。 */
+    private static final long PLAYERS_CACHE_MS = 900L;
 
     private record RateWindow(long start, int count) {
     }
@@ -45,6 +50,8 @@ public final class HttpApiServer {
     private ExecutorService executor;
     private volatile String pageHtml = "";
     private volatile String langCache;
+    private volatile String playersSnapshot;
+    private volatile long playersSnapshotAt;
     private final Map<String, RateWindow> rateWindows = new ConcurrentHashMap<>();
     private final Map<String, RateWindow> assetWindows = new ConcurrentHashMap<>();
     private final Semaphore streamSlots = new Semaphore(16);
@@ -60,6 +67,11 @@ public final class HttpApiServer {
 
     public void setAccessKey(AccessKey accessKey) {
         this.accessKey = accessKey;
+    }
+
+    /** 开服异步预热贴图包，别让第一次打开网页的人等主线程解压 zip。 */
+    public void warmupTextures() {
+        textures.warmup();
     }
 
     public synchronized boolean start() {
@@ -267,6 +279,10 @@ public final class HttpApiServer {
 
     /** 自检接口：贴图包加载情况和示例物品。 */
     private void handleDiag(HttpExchange exchange) throws IOException {
+        if (!allow(ipOf(exchange))) {
+            respondJson(exchange, 429, errorJson("rate_limited", "请求过于频繁。"));
+            return;
+        }
         if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
             respondJson(exchange, 405, errorJson("method_not_allowed", "只支持 GET。"));
             return;
@@ -323,6 +339,10 @@ public final class HttpApiServer {
      * SSE 实时推送：每秒把在线玩家列表与目标玩家的背包变化推给浏览器，页面无需轮询。
      */
     private void handleStream(HttpExchange exchange) throws IOException {
+        if (!allow(ipOf(exchange))) {
+            respondJson(exchange, 429, errorJson("rate_limited", "请求过于频繁。"));
+            return;
+        }
         if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
             respondJson(exchange, 405, errorJson("method_not_allowed", "只支持 GET。"));
             return;
@@ -364,13 +384,15 @@ public final class HttpApiServer {
             long interval = plugin.settings().liveIntervalMs();
             long deadline = System.currentTimeMillis() + 30 * 60_000L;
             String lastPlayers = null;
+            String lastInv = null;
+            long lastInvPush = 0L;
             boolean offlineSent = false;
             long lastWrite = System.currentTimeMillis();
 
             while (System.currentTimeMillis() < deadline) {
                 String players;
                 try {
-                    players = plugin.capturePlayersAsync().get(3, TimeUnit.SECONDS);
+                    players = cachedPlayers();
                 } catch (Exception e) {
                     break;
                 }
@@ -388,17 +410,25 @@ public final class HttpApiServer {
                 } catch (Exception e) {
                     break;
                 }
+                long now = System.currentTimeMillis();
                 if (inv == null) {
                     if (!offlineSent) {
                         writeEvent(out, "offline", "{}");
                         offlineSent = true;
                     }
+                    lastInv = null;
                 } else {
                     offlineSent = false;
-                    writeEvent(out, "inv", inv);
+                    // 背包没变就不重复推，最多 5 秒补一次（血量/坐标这类字段要跟着走）
+                    String stable = stripTime(inv);
+                    if (!stable.equals(lastInv) || now - lastInvPush >= 5_000L) {
+                        writeEvent(out, "inv", inv);
+                        lastInv = stable;
+                        lastInvPush = now;
+                    }
                 }
                 Thread.sleep(interval);
-                long now = System.currentTimeMillis();
+                now = System.currentTimeMillis();
                 if (now - lastWrite >= 15_000L) {
                     out.write(": ping\n\n".getBytes(StandardCharsets.UTF_8));
                     out.flush();
@@ -427,9 +457,27 @@ public final class HttpApiServer {
         out.flush();
     }
 
+    /**
+     * 多条 SSE 流共用一份在线列表：缓存 900ms，16 条流也只打一次主线程，
+     * 而不是每条流每秒各打一次。
+     */
+    private synchronized String cachedPlayers() throws Exception {
+        long now = System.currentTimeMillis();
+        String cached = playersSnapshot;
+        if (cached != null && now - playersSnapshotAt < PLAYERS_CACHE_MS) {
+            return cached;
+        }
+        String fresh = plugin.capturePlayersAsync().get(3, TimeUnit.SECONDS);
+        if (fresh != null) {
+            playersSnapshot = fresh;
+            playersSnapshotAt = now;
+        }
+        return fresh;
+    }
+
     /** 去掉时间戳后再比较，避免每秒都推送未变化的在线列表。 */
     private static String stripTime(String json) {
-        return json.replaceFirst("\"time\":\\d+,", "");
+        return TIME_FIELD.matcher(json).replaceFirst("");
     }
 
     private void handleLang(HttpExchange exchange) throws IOException {
@@ -551,7 +599,8 @@ public final class HttpApiServer {
             return new RateWindow(old.start(), old.count() + 1);
         });
         if (windows.size() > 20_000) {
-            windows.clear();
+            // 只淘汰过期的窗口，别整体 clear —— clear 的那一瞬间等于给所有人重置配额
+            windows.entrySet().removeIf(entry -> now - entry.getValue().start() > 60_000L);
         }
         return window.count() <= limit;
     }
@@ -592,7 +641,8 @@ public final class HttpApiServer {
         return value != null && ("1".equals(value) || "true".equalsIgnoreCase(value) || "yes".equalsIgnoreCase(value));
     }
 
-    private static String errorJson(String code, String message) {        Json json = new Json(256);
+    private static String errorJson(String code, String message) {
+        Json json = new Json(256);
         json.beginObject();
         json.name("ok").value(false);
         json.name("error").value(code);

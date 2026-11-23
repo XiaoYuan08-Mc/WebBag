@@ -57,6 +57,14 @@ public final class WebBagPlugin extends JavaPlugin {
         if (http.start()) {
             getLogger().info("Web inventory dashboard listening on " + settings.bind() + ":" + settings.port());
             getLogger().info("Run /webbag as an administrator to get the access link.");
+            // 贴图包在异步线程预热：第一次打开网页时不至于让主线程解压 zip
+            Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+                try {
+                    http.warmupTextures();
+                } catch (Throwable t) {
+                    getLogger().warning("预热贴图包失败: " + t.getMessage());
+                }
+            });
         } else {
             getLogger().severe("Failed to start HTTP service. Check port " + settings.port() + " and bind address.");
         }

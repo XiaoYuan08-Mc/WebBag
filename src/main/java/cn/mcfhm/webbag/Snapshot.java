@@ -153,13 +153,23 @@ final class Snapshot {
             }
         }
 
-        if (meta != null && meta.hasCustomModelData()) {
-            json.name("cmd").value(meta.getCustomModelData());
+        Integer cmd = customModelData(meta);
+        if (cmd != null) {
+            json.name("cmd").value(cmd);
         }
         if (meta != null && meta.isUnbreakable()) {
             json.name("unbreakable").value(true);
         }
         json.endObject();
+    }
+
+    /** 老的自定义模型数据没有非过时的读取方式，这里单独收口并抑制告警。 */
+    @SuppressWarnings("deprecation")
+    private static Integer customModelData(ItemMeta meta) {
+        if (meta == null || !meta.hasCustomModelData()) {
+            return null;
+        }
+        return meta.getCustomModelData();
     }
 
     private static String displayName(ItemMeta meta) {

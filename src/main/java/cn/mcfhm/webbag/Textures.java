@@ -26,9 +26,11 @@ final class Textures {
             .connectTimeout(Duration.ofSeconds(8))
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
-    private final Set<String> missing = ConcurrentHashMap.newKeySet();
+    private final java.util.Map<String, Long> missAt = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long MISSING_TTL_MS = 10 * 60_000L;
     private final java.util.Map<String, byte[]> bundled = new java.util.concurrent.ConcurrentHashMap<>();
     private final java.util.Map<String, String> uriCache = new java.util.concurrent.ConcurrentHashMap<>();
+    private final Object bundleLock = new Object();
     private volatile boolean bundleLoaded;
 
     private static volatile Textures instance;
@@ -45,7 +47,7 @@ final class Textures {
         }
         String cached = uriCache.get(key);
         if (cached != null) {
-            return cached.isEmpty() ? null : cached;
+            return cached;
         }
         byte[] png = null;
         for (String relative : candidates(key)) {
@@ -54,10 +56,13 @@ final class Textures {
                 break;
             }
         }
-        String uri = png == null ? "" : "data:image/png;base64,"
-                + java.util.Base64.getEncoder().encodeToString(png);
+        if (png == null) {
+            // 不缓存"没取到"，交给 missAt 的 TTL 决定什么时候重试
+            return null;
+        }
+        String uri = "data:image/png;base64," + java.util.Base64.getEncoder().encodeToString(png);
         uriCache.put(key, uri);
-        return uri.isEmpty() ? null : uri;
+        return uri;
     }
 
     /** 自检：jar 内贴图是否加载、某个物品能不能取到图。 */
@@ -169,7 +174,7 @@ final class Textures {
         } catch (IOException ignored) {
             // 读不到就当没缓存
         }
-        if (missing.contains(key)) {
+        if (isMissing(key)) {
             return null;
         }
 
@@ -182,9 +187,7 @@ final class Textures {
         }
         // jar 里带的就是当前版本的全套贴图，命中不了再多走外网也没用
         if (BUNDLE_VERSION.equals(plugin.settings().assetsVersion())) {
-            if (missing.size() < 20_000) {
-                missing.add(key);
-            }
+            markMissing(key);
             return null;
         }
         for (String relative : candidates(key)) {
@@ -194,10 +197,28 @@ final class Textures {
                 return png;
             }
         }
-        if (missing.size() < 20_000) {
-            missing.add(key);
-        }
+        markMissing(key);
         return null;
+    }
+
+    private boolean isMissing(String key) {
+        Long at = missAt.get(key);
+        if (at == null) {
+            return false;
+        }
+        if (System.currentTimeMillis() - at > MISSING_TTL_MS) {
+            missAt.remove(key);
+            return false;
+        }
+        return true;
+    }
+
+    private void markMissing(String key) {
+        long now = System.currentTimeMillis();
+        if (missAt.size() > 20_000) {
+            missAt.entrySet().removeIf(entry -> now - entry.getValue() > MISSING_TTL_MS);
+        }
+        missAt.put(key, now);
     }
 
     /** jar 里带的原版贴图，服务器不联网也能出图标。 */
@@ -206,30 +227,43 @@ final class Textures {
         return bundled.get(relative);
     }
 
+    /** 开服预热：把 zip 解压放到异步线程，避免第一次打开网页时卡主线程。 */
+    void warmup() {
+        loadBundle();
+    }
+
     private void loadBundle() {
         if (bundleLoaded) {
             return;
         }
-        bundleLoaded = true;
-        try (java.io.InputStream in = Textures.class.getResourceAsStream("/textures.zip")) {
-            if (in == null) {
-                plugin.getLogger().warning("Bundled textures.zip is missing, icons need network.");
+        // 双检：首屏会并发请求几十张图，必须等第一个线程真正读完再放行，
+        // 否则后到的线程拿到半空 map，会把这一批图标写进负缓存。
+        synchronized (bundleLock) {
+            if (bundleLoaded) {
                 return;
             }
-            try (java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(in)) {
-                java.util.zip.ZipEntry entry;
-                while ((entry = zip.getNextEntry()) != null) {
-                    if (entry.isDirectory()) {
-                        continue;
-                    }
-                    byte[] data = zip.readAllBytes();
-                    if (isPng(data)) {
-                        bundled.put(entry.getName().replace('\\', '/'), data);
+            try (java.io.InputStream in = Textures.class.getResourceAsStream("/textures.zip")) {
+                if (in == null) {
+                    plugin.getLogger().warning("Bundled textures.zip is missing, icons need network.");
+                    bundleLoaded = true;
+                    return;
+                }
+                try (java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(in)) {
+                    java.util.zip.ZipEntry entry;
+                    while ((entry = zip.getNextEntry()) != null) {
+                        if (entry.isDirectory()) {
+                            continue;
+                        }
+                        byte[] data = zip.readAllBytes();
+                        if (isPng(data)) {
+                            bundled.put(entry.getName().replace('\\', '/'), data);
+                        }
                     }
                 }
+            } catch (Exception e) {
+                plugin.getLogger().warning("Could not load bundled textures: " + e.getMessage());
             }
-        } catch (Exception e) {
-            plugin.getLogger().warning("Could not load bundled textures: " + e.getMessage());
+            bundleLoaded = true;
         }
     }
 
