@@ -114,6 +114,7 @@ public final class HttpApiServer {
             }
             String html = new String(in.readAllBytes(), StandardCharsets.UTF_8);
             pageHtml = html
+                    .replace("__VERSION__", plugin.getPluginMeta().getVersion())
                     .replace("__ASSETS_CDN__", settings.assetsCdn())
                     .replace("__REFRESH__", String.valueOf(settings.refreshSeconds()))
                     .replace("__LIVE__", String.valueOf(settings.liveUpdate()))
@@ -147,6 +148,7 @@ public final class HttpApiServer {
             exchange.getResponseHeaders().add("Set-Cookie",
                     COOKIE_NAME + "=" + key + "; Path=/; Max-Age=2592000; HttpOnly; SameSite=Lax");
         }
+        exchange.getResponseHeaders().add("Cache-Control", "no-store");
         respond(exchange, 200, "text/html; charset=utf-8", pageHtml.getBytes(StandardCharsets.UTF_8));
     }
 

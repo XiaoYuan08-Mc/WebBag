@@ -17,7 +17,8 @@ import java.util.concurrent.ConcurrentHashMap;
  */
 final class Textures {
 
-    private static final String[] DIRS = {"item", "block"};
+    /** jar 内自带贴图对应的版本。 */
+    private static final String BUNDLE_VERSION = "26.3";
 
     private final WebBagPlugin plugin;
     private final Path cacheDir;
@@ -26,6 +27,8 @@ final class Textures {
             .followRedirects(HttpClient.Redirect.NORMAL)
             .build();
     private final Set<String> missing = ConcurrentHashMap.newKeySet();
+    private final java.util.Map<String, byte[]> bundled = new java.util.concurrent.ConcurrentHashMap<>();
+    private volatile boolean bundleLoaded;
 
     Textures(WebBagPlugin plugin) {
         this.plugin = plugin;
@@ -66,6 +69,20 @@ final class Textures {
         }
 
         for (String relative : candidates(key)) {
+            byte[] png = fromBundle(relative);
+            if (png != null) {
+                save(cached, png);
+                return png;
+            }
+        }
+        // jar 里带的就是当前版本的全套贴图，命中不了再多走外网也没用
+        if (BUNDLE_VERSION.equals(plugin.settings().assetsVersion())) {
+            if (missing.size() < 20_000) {
+                missing.add(key);
+            }
+            return null;
+        }
+        for (String relative : candidates(key)) {
             byte[] png = fetch(relative);
             if (png != null) {
                 save(cached, png);
@@ -76,6 +93,39 @@ final class Textures {
             missing.add(key);
         }
         return null;
+    }
+
+    /** jar 里带的原版贴图，服务器不联网也能出图标。 */
+    private byte[] fromBundle(String relative) {
+        loadBundle();
+        return bundled.get(relative);
+    }
+
+    private void loadBundle() {
+        if (bundleLoaded) {
+            return;
+        }
+        bundleLoaded = true;
+        try (java.io.InputStream in = Textures.class.getResourceAsStream("/textures.zip")) {
+            if (in == null) {
+                plugin.getLogger().warning("Bundled textures.zip is missing, icons need network.");
+                return;
+            }
+            try (java.util.zip.ZipInputStream zip = new java.util.zip.ZipInputStream(in)) {
+                java.util.zip.ZipEntry entry;
+                while ((entry = zip.getNextEntry()) != null) {
+                    if (entry.isDirectory()) {
+                        continue;
+                    }
+                    byte[] data = zip.readAllBytes();
+                    if (isPng(data)) {
+                        bundled.put(entry.getName().replace('\\', '/'), data);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            plugin.getLogger().warning("Could not load bundled textures: " + e.getMessage());
+        }
     }
 
     /** 同一物品在新版本里贴图文件名变了的情况，直接给死路径。 */

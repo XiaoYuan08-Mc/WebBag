@@ -32,6 +32,7 @@
     position:sticky;top:0;z-index:10;
   }
   .brand{font-size:15px;font-weight:600;letter-spacing:.02em}
+  .ver{margin-left:8px;font-size:11px;font-weight:400;color:var(--muted)}
   .top .grow{flex:1}
   .top .online{font-size:12.5px;color:var(--muted)}
   .top .status{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
@@ -240,7 +241,7 @@
 <body>
 
 <header class="top">
-  <div class="brand">网页背包</div>
+  <div class="brand">网页背包<span class="ver" id="ver"></span></div>
   <div class="grow"></div>
   <div class="online" id="online">在线 0 人</div>
   <div class="status" id="status"><i></i><span>连接中</span></div>
@@ -321,6 +322,7 @@
 
 <script>
 window.WB_CFG = {
+  version: "__VERSION__",
   assetsCdn: "__ASSETS_CDN__",
   refresh: __REFRESH__,
   live: __LIVE__,
@@ -364,6 +366,7 @@ window.WB_CFG = {
 
   function boot() {
     const params = new URLSearchParams(location.search);
+    if (CFG.version) $("ver").textContent = "v" + CFG.version;
     S.key = params.get("key") || sessionStorage.getItem("webbag.key") || "";
     S.wantPlayer = params.get("player") || "";
     if (params.get("key")) {
