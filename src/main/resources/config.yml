@@ -1,0 +1,34 @@
+# WebBag 配置
+
+# 网页监听端口
+port: 5001
+
+# 监听地址：0.0.0.0 允许外部访问；127.0.0.1 仅本机（配合反向代理）
+bind: "0.0.0.0"
+
+# 对外访问地址，例如 https://bag.example.com
+# 留空则使用 http://<本机内网 IP>:<端口>
+public-url: ""
+
+# 访问口令，留空时首次启动自动生成并写回本文件
+# 更换口令可执行 /webbag newkey
+access-key: ""
+
+# 是否允许查看末影箱
+allow-ender-chest: true
+
+# 物品贴图与原版语言文件来源
+assets-cdn: "https://cdn.jsdelivr.net/gh/InventivetalentDev/minecraft-assets@{version}/assets/minecraft"
+assets-version: "26.3"
+
+# 实时推送：开启后页面每秒收到一次推送，不需要手动刷新
+live-update: true
+
+# 推送间隔（毫秒），最低 500
+live-interval-ms: 1000
+
+# 兜底轮询间隔（秒）：实时推送不可用时使用，0 为关闭
+refresh-seconds: 10
+
+# 单个 IP 每分钟请求上限
+rate-limit-per-minute: 180

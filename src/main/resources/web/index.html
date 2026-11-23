@@ -1,0 +1,907 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>网页背包</title>
+<style>
+  :root{
+    --bg:#0f1115;
+    --panel:#171a1f;
+    --panel-2:#1d2128;
+    --line:#2a3038;
+    --text:#e6e9ee;
+    --muted:#8b95a5;
+    --accent:#4c9aff;
+    --ok:#3fb950;
+    --bad:#f85149;
+    --cell:52px;
+    --gap:4px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{
+    font-family:-apple-system,"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+    font-size:14px;line-height:1.5;
+    background:var(--bg);color:var(--text);
+    min-height:100vh;
+  }
+
+  /* 顶栏 */
+  .top{
+    display:flex;align-items:center;gap:12px;
+    padding:0 16px;height:56px;
+    background:var(--panel);border-bottom:1px solid var(--line);
+    position:sticky;top:0;z-index:10;
+  }
+  .brand{font-size:16px;font-weight:600}
+  .top .sub{font-size:12px;color:var(--muted)}
+  .top .grow{flex:1}
+  .top .online{font-size:12.5px;color:var(--muted)}
+  .top .status{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted)}
+  .top .status i{width:7px;height:7px;border-radius:50%;background:var(--muted)}
+  .top .status.ok i{background:var(--ok)}
+  .top .status.bad i{background:var(--bad)}
+  .btn{
+    font:inherit;font-size:13px;color:var(--text);
+    background:var(--panel-2);border:1px solid var(--line);
+    border-radius:6px;padding:6px 14px;cursor:pointer;
+  }
+  .btn:hover{border-color:#3a424e}
+  .btn:disabled{opacity:.6;cursor:default}
+
+  /* 布局 */
+  .layout{
+    max-width:1180px;margin:0 auto;padding:20px 16px;
+    display:grid;grid-template-columns:248px minmax(0,1fr);
+    gap:16px;align-items:start;
+  }
+
+  /* 在线玩家 */
+  .players{
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    padding:12px;max-height:calc(100vh - 120px);overflow:auto;
+  }
+  .players h3{
+    font-size:12px;font-weight:500;color:var(--muted);
+    padding:0 8px 8px;
+  }
+  .players ul{list-style:none}
+  .prow{
+    display:flex;align-items:center;gap:9px;
+    padding:7px 8px;border-radius:6px;cursor:pointer;
+    border-left:2px solid transparent;
+  }
+  .prow:hover{background:#20252d}
+  .prow.active{background:#20252d;border-left-color:var(--accent)}
+  .prow img{width:26px;height:26px;border-radius:4px;image-rendering:pixelated;background:#242a33}
+  .prow .letter{
+    width:26px;height:26px;border-radius:4px;display:none;
+    align-items:center;justify-content:center;
+    background:#242a33;color:#b8c2d0;font-size:12px;font-weight:600
+  }
+  .prow .info{min-width:0}
+  .prow .name{
+    font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .prow .world{font-size:11px;color:var(--muted)}
+  .players .none{padding:14px 8px;font-size:12.5px;color:var(--muted)}
+
+  /* 主面板 */
+  .panel{
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;
+    min-width:0;
+  }
+  .panel-head{
+    display:flex;align-items:center;gap:12px;
+    padding:16px 20px;
+  }
+  .avatar{
+    width:40px;height:40px;border-radius:6px;image-rendering:pixelated;
+    background:#242a33;flex:none;
+  }
+  .who{min-width:0}
+  .who h2{font-size:15px;font-weight:600;line-height:1.3}
+  .who .meta{font-size:12px;color:var(--muted);margin-top:2px}
+  .stats{
+    margin-left:auto;text-align:right;
+    font-size:12.5px;color:var(--muted);
+  }
+  .stats span{margin-left:14px;white-space:nowrap}
+
+  .tabs{
+    display:flex;gap:4px;padding:0 20px;
+    border-bottom:1px solid var(--line);
+  }
+  .tab{
+    font:inherit;font-size:13px;color:var(--muted);
+    background:none;border:none;border-bottom:2px solid transparent;
+    padding:8px 10px;margin-bottom:-1px;cursor:pointer;
+  }
+  .tab:hover{color:var(--text)}
+  .tab.active{color:var(--text);border-bottom-color:var(--accent)}
+  .tab[hidden]{display:none}
+
+  .notice{
+    display:none;padding:9px 20px;font-size:12.5px;
+    color:#ffd7a8;background:#2a2218;border-bottom:1px solid #3d3120;
+  }
+  .notice.show{display:block}
+
+  /* 背包 */
+  .wrap{padding:18px 20px;overflow-x:auto}
+  .wrap.hidden{display:none}
+  .inv{display:flex;gap:18px;align-items:flex-start;width:max-content;margin:0 auto}
+  .inv.hidden{display:none}
+  .side{flex:none}
+  .main{min-width:0;overflow-x:auto}
+  .col-title{
+    font-size:11.5px;color:var(--muted);margin-bottom:6px;padding-left:2px;
+  }
+  .col-title.gap{margin-top:16px}
+  .grid{display:grid;gap:var(--gap)}
+  .grid9{grid-template-columns:repeat(9,var(--cell))}
+  .armor,.single{grid-template-columns:var(--cell)}
+  .hotbar-gap{height:12px}
+
+  .cell{
+    width:var(--cell);height:var(--cell);border-radius:5px;
+    background:#21262e;border:1px solid #333a44;
+    position:relative;display:grid;place-items:center;
+  }
+  .cell.empty{background:#1b1f25;border-color:#262c34}
+  .cell.filled:hover{border-color:var(--accent)}
+  .cell .hint{font-size:11px;color:#5b6675}
+  .cell.ench{box-shadow:inset 0 0 0 1px rgba(167,139,250,.45)}
+
+  .icon{width:38px;height:38px;position:relative}
+  .icon img{width:100%;height:100%;object-fit:contain;image-rendering:pixelated}
+  .icon .fallback{
+    display:none;width:100%;height:100%;border-radius:4px;
+    place-items:center;background:#2d333d;color:#c7d0dc;font-size:13px;font-weight:600;
+  }
+  .count{
+    position:absolute;right:3px;bottom:1px;font-size:11px;font-weight:600;color:#fff;
+    text-shadow:0 1px 2px #000;pointer-events:none;
+  }
+  .dura{
+    position:absolute;left:4px;right:4px;bottom:3px;height:2px;
+    background:rgba(0,0,0,.6);border-radius:1px;overflow:hidden;pointer-events:none;
+  }
+  .dura i{display:block;height:100%}
+
+  .panel-foot{
+    display:flex;justify-content:space-between;gap:12px;
+    padding:10px 20px;border-top:1px solid var(--line);
+    font-size:12px;color:var(--muted);
+  }
+
+  .empty-state{padding:40px 20px;color:var(--muted);font-size:13px;text-align:center}
+
+  /* 提示 */
+  .tip{
+    position:fixed;z-index:40;pointer-events:none;opacity:0;
+    max-width:260px;padding:8px 10px;border-radius:6px;
+    background:#0c0f13;border:1px solid #3a424e;
+    box-shadow:0 8px 24px rgba(0,0,0,.5);
+    font-size:12.5px;line-height:1.55;
+  }
+  .tip.show{opacity:1}
+  .tip .name{color:#f2f5f9;font-weight:600}
+  .tip .lore{color:#b18cf0}
+  .tip .ench{color:#7cc0f5}
+  .tip .dura{color:var(--muted)}
+  .tip .id{color:#5f6b7b;font-size:11px;margin-top:4px}
+
+  /* 浮层 */
+  .overlay{
+    position:fixed;inset:0;z-index:50;display:none;
+    align-items:center;justify-content:center;padding:20px;
+    background:rgba(0,0,0,.65);
+  }
+  .overlay.show{display:flex}
+  .modal{
+    width:100%;max-width:420px;padding:20px;border-radius:8px;
+    background:var(--panel);border:1px solid var(--line);
+  }
+  .modal h2{font-size:15px;font-weight:600;margin-bottom:8px}
+  .modal p{font-size:13px;color:var(--muted);line-height:1.7}
+  .modal code{
+    display:block;margin-top:12px;padding:8px 10px;border-radius:6px;
+    background:#0c0f13;border:1px solid #2a3038;
+    font-family:ui-monospace,Consolas,monospace;font-size:13px;color:#9ad19f;
+  }
+
+  @media (max-width:860px){
+    :root{--cell:44px}
+    .layout{grid-template-columns:1fr;padding:14px 12px}
+    .players{max-height:none}
+    .players ul{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px}
+    .prow{flex:none;border-left:none;border-bottom:2px solid transparent}
+    .prow.active{border-left:none;border-bottom-color:var(--accent)}
+    .panel-head{flex-wrap:wrap}
+    .stats{margin-left:0;width:100%;text-align:left}
+    .icon{width:32px;height:32px}
+  }
+  @media (max-width:560px){
+    :root{--cell:38px}
+    .inv{gap:12px}
+    .wrap{padding:14px}
+  }
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="brand">网页背包</div>
+  <div class="sub">只读查看</div>
+  <div class="grow"></div>
+  <div class="online" id="online">在线 0 人</div>
+  <div class="status" id="status"><i></i><span>连接中</span></div>
+  <button class="btn" id="refresh">刷新</button>
+</header>
+
+<main class="layout">
+  <aside class="players">
+    <h3>在线玩家</h3>
+    <ul id="playerList"></ul>
+    <div class="none" id="playersNone">当前没有在线玩家</div>
+  </aside>
+
+  <section class="panel">
+    <div class="panel-head">
+      <img class="avatar" id="avatar" alt="">
+      <div class="who">
+        <h2 id="playerName">未选择玩家</h2>
+        <div class="meta" id="playerMeta">从左侧列表选择一名在线玩家</div>
+      </div>
+      <div class="stats" id="stats"></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-type="inv">背包</button>
+      <button class="tab" data-type="ender" id="tabEnder">末影箱</button>
+    </div>
+
+    <div class="notice" id="notice"></div>
+
+    <div class="wrap" id="wrap">
+      <div class="inv" id="invView">
+        <div class="side">
+          <div class="col-title">装备</div>
+          <div class="grid armor" id="armorCells"></div>
+          <div class="col-title gap">副手</div>
+          <div class="grid single" id="offhandCells"></div>
+        </div>
+        <div class="main">
+          <div class="col-title">&nbsp;</div>
+          <div class="grid grid9" id="mainCells"></div>
+          <div class="hotbar-gap"></div>
+          <div class="grid grid9" id="hotbarCells"></div>
+        </div>
+      </div>
+
+      <div class="inv hidden" id="enderView">
+        <div class="main">
+          <div class="grid grid9" id="enderCells"></div>
+        </div>
+      </div>
+
+      <div class="empty-state" id="emptyState">未选择玩家</div>
+    </div>
+
+    <div class="panel-foot">
+      <span id="updated">尚未刷新</span>
+      <span id="countdown"></span>
+    </div>
+  </section>
+</main>
+
+<div class="tip" id="tip"></div>
+
+<div class="overlay" id="overlay">
+  <div class="modal">
+    <h2 id="overlayTitle">无法打开</h2>
+    <p id="overlayText">链接缺少访问口令。</p>
+    <code id="overlayCode">/webbag</code>
+  </div>
+</div>
+
+<script>
+window.WB_CFG = {
+  assetsCdn: "__ASSETS_CDN__",
+  refresh: __REFRESH__,
+  live: __LIVE__,
+  allowEnder: __ALLOW_ENDER__
+};
+</script>
+<script>
+(() => {
+  "use strict";
+
+  const CFG = Object.assign({ assetsCdn: "", refresh: 10, live: true, allowEnder: true }, window.WB_CFG || {});
+  const ARMOR_LABELS = ["头盔", "胸甲", "护腿", "靴子"];
+  const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X"];
+  const MODE_LABEL = { SURVIVAL: "生存", CREATIVE: "创造", ADVENTURE: "冒险", SPECTATOR: "旁观" };
+
+  const S = {
+    key: "",
+    players: [],
+    uuid: "",
+    type: "inv",
+    lang: {},
+    timer: null,
+    deadline: 0,
+    busy: false,
+    data: null,
+    es: null,
+    fails: 0,
+    sig: "",
+    rendered: false,
+    avatarUuid: ""
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const tip = $("tip");
+  let tipOwner = null;
+  let tipItem = null;
+
+  boot();
+
+  function boot() {
+    const params = new URLSearchParams(location.search);
+    S.key = params.get("key") || sessionStorage.getItem("webbag.key") || "";
+    if (params.get("key")) {
+      sessionStorage.setItem("webbag.key", S.key);
+      try {
+        history.replaceState(null, "", location.pathname);
+      } catch (e) {
+        // 忽略
+      }
+    }
+
+    if (!CFG.allowEnder) {
+      $("tabEnder").hidden = true;
+    }
+
+    document.querySelectorAll(".tab").forEach(tab => {
+      tab.addEventListener("click", () => {
+        if (S.type === tab.dataset.type) return;
+        S.type = tab.dataset.type;
+        document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t === tab));
+        $("invView").classList.toggle("hidden", S.type !== "inv");
+        $("enderView").classList.toggle("hidden", S.type !== "ender");
+        hideTip();
+        loadInventory();
+        startStream();
+      });
+    });
+
+    $("refresh").addEventListener("click", () => refreshAll(true));
+    document.addEventListener("click", hideTip);
+
+    if (!S.key) {
+      showOverlay("链接缺少访问口令", "请在游戏内以管理员身份执行 /webbag，使用它给出的链接打开。", "/webbag");
+      return;
+    }
+
+    loadLang();
+    refreshAll();
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) refreshAll();
+    });
+  }
+
+  function api(path) {
+    if (!S.key) return path;
+    return path + (path.indexOf("?") >= 0 ? "&" : "?") + "key=" + encodeURIComponent(S.key);
+  }
+
+  async function loadLang() {
+    try {
+      const res = await fetch(api("api/lang"));
+      if (res.ok) S.lang = await res.json();
+    } catch (e) {
+      S.lang = {};
+    }
+  }
+
+  async function refreshAll(manual) {
+    if (S.busy) return;
+    S.busy = true;
+    $("refresh").disabled = true;
+    try {
+      const res = await fetch(api("api/players"));
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data || data.ok !== true) {
+        setStatus(false, "读取失败");
+        handleError(res.status);
+        return;
+      }
+      S.players = data.players || [];
+      setStatus(true, "已连接");
+      $("online").textContent = `在线 ${data.count ?? S.players.length} 人`;
+
+      if (!S.uuid || !S.players.some(p => p.uuid === S.uuid)) {
+        S.uuid = S.players.length ? S.players[0].uuid : "";
+      }
+      renderPlayers();
+      await loadInventory();
+      startStream();
+    } catch (e) {
+      setStatus(false, "连接失败");
+      showOverlay("无法连接服务器", "网页服务未启动或链接已失效，请重新执行 /webbag。", "/webbag");
+    } finally {
+      S.busy = false;
+      $("refresh").disabled = false;
+      schedule();
+    }
+  }
+
+  async function loadInventory() {
+    if (!S.uuid) {
+      S.data = null;
+      renderPlaceholder("当前没有在线玩家");
+      showNotice("");
+      updateTime();
+      return;
+    }
+    const res = await fetch(api(`api/inventory?player=${encodeURIComponent(S.uuid)}&type=${S.type}`));
+    const data = await res.json().catch(() => null);
+    if (!res.ok || !data || data.ok !== true) {
+      if (res.status === 404) {
+        showNotice("该玩家已离线，正在刷新列表");
+        S.data = null;
+        renderPlaceholder("该玩家已离线");
+        setTimeout(() => refreshAll(), 1500);
+        return;
+      }
+      handleError(res.status);
+      return;
+    }
+    showNotice("");
+    S.data = data;
+    render(data);
+    updateTime();
+  }
+
+  function handleError(status) {
+    if (status === 401) {
+      stopStream();
+      showOverlay("访问口令无效", "口令已更换或链接不完整，请在游戏内重新执行 /webbag。", "/webbag");
+    } else if (status === 403) {
+      stopStream();
+      showOverlay("末影箱不可查看", "服务器配置中已关闭末影箱查看。", "");
+    } else if (status === 429) {
+      showOverlay("请求过于频繁", "请稍等片刻再刷新。", "");
+    } else {
+      showOverlay("服务异常", "请稍后重试，或查看服务器控制台日志。", "");
+    }
+  }
+
+  function streamOpen() {
+    return Boolean(S.es && S.es.readyState === EventSource.OPEN);
+  }
+
+  function startStream() {
+    stopStream();
+    if (!CFG.live || !S.uuid) return;
+    const es = new EventSource(api(`api/stream?player=${encodeURIComponent(S.uuid)}&type=${S.type}`));
+    S.es = es;
+    es.addEventListener("players", ev => { if (S.es === es) onStreamPlayers(ev); });
+    es.addEventListener("inv", ev => { if (S.es === es) onStreamInventory(ev); });
+    es.addEventListener("offline", () => {
+      if (S.es !== es) return;
+      showNotice("该玩家已离线，正在重新读取列表");
+      renderPlaceholder("该玩家已离线");
+    });
+    es.onopen = () => {
+      S.fails = 0;
+      setStatus(true, "实时");
+      $("countdown").textContent = "实时更新";
+    };
+    es.onerror = () => {
+      if (S.es !== es) return;
+      S.fails += 1;
+      setStatus(false, S.fails > 2 ? "实时断开" : "重连中");
+      if (S.fails >= 6) stopStream();
+    };
+  }
+
+  function stopStream() {
+    if (S.es) {
+      S.es.close();
+      S.es = null;
+    }
+  }
+
+  function onStreamPlayers(ev) {
+    let data;
+    try { data = JSON.parse(ev.data); } catch (e) { return; }
+    S.players = data.players || [];
+    $("online").textContent = `在线 ${data.count ?? S.players.length} 人`;
+    if (S.uuid && S.players.some(p => p.uuid === S.uuid)) {
+      renderPlayers();
+      return;
+    }
+    S.uuid = S.players.length ? S.players[0].uuid : "";
+    renderPlayers();
+    if (S.uuid) {
+      loadInventory();
+      startStream();
+    } else {
+      renderPlaceholder("当前没有在线玩家");
+    }
+  }
+
+  function onStreamInventory(ev) {
+    let data;
+    try { data = JSON.parse(ev.data); } catch (e) { return; }
+    if (!data || !data.player || data.player.uuid !== S.uuid) return;
+    if (data.type && data.type !== S.type) return;
+    showNotice("");
+    S.data = data;
+    if (!S.rendered) {
+      render(data);
+      updateTime();
+      return;
+    }
+    renderHeader(data);
+    const sig = gridSignature(data);
+    if (sig !== S.sig) {
+      renderGrids(data);
+      S.sig = sig;
+      hideTip();
+    }
+    updateTime();
+  }
+
+  function schedule() {
+    clearTimeout(S.timer);
+    if (CFG.refresh <= 0 && !CFG.live) {
+      $("countdown").textContent = "";
+      return;
+    }
+    S.deadline = Date.now() + Math.max(1, CFG.refresh) * 1000;
+    const tick = () => {
+      if (streamOpen()) {
+        $("countdown").textContent = "实时更新";
+        S.deadline = Date.now() + Math.max(1, CFG.refresh) * 1000;
+        S.timer = setTimeout(tick, 1000);
+        return;
+      }
+      if (CFG.refresh <= 0) {
+        $("countdown").textContent = "";
+        S.timer = setTimeout(tick, 1000);
+        return;
+      }
+      const left = Math.max(0, Math.ceil((S.deadline - Date.now()) / 1000));
+      $("countdown").textContent = `${left} 秒后刷新`;
+      if (left <= 0) {
+        if (!document.hidden) refreshAll();
+        else S.deadline = Date.now() + CFG.refresh * 1000;
+      }
+      S.timer = setTimeout(tick, 500);
+    };
+    tick();
+  }
+
+  function setStatus(ok, text) {
+    const node = $("status");
+    node.classList.toggle("ok", ok);
+    node.classList.toggle("bad", !ok);
+    node.querySelector("span").textContent = text;
+  }
+
+  function showNotice(text) {
+    const node = $("notice");
+    node.textContent = text;
+    node.classList.toggle("show", Boolean(text));
+  }
+
+  function renderPlayers() {
+    const list = $("playerList");
+    list.innerHTML = "";
+    S.players.forEach(p => {
+      const row = document.createElement("li");
+      row.className = "prow" + (p.uuid === S.uuid ? " active" : "");
+
+      const img = document.createElement("img");
+      const letter = document.createElement("span");
+      letter.className = "letter";
+      letter.textContent = (p.name || "?").slice(0, 1).toUpperCase();
+      letter.style.display = "none";
+      setAvatar(img, p.uuid, p.name, 32, () => {
+        img.style.display = "none";
+        letter.style.display = "flex";
+      });
+
+      const info = document.createElement("div");
+      info.className = "info";
+      const name = document.createElement("div");
+      name.className = "name";
+      name.textContent = p.name;
+      const world = document.createElement("div");
+      world.className = "world";
+      world.textContent = `${p.world || "-"} · ${MODE_LABEL[p.mode] || p.mode || ""}`;
+      info.append(name, world);
+
+      row.append(img, letter, info);
+      row.addEventListener("click", () => {
+        S.uuid = p.uuid;
+        renderPlayers();
+        hideTip();
+        loadInventory();
+        startStream();
+      });
+      list.appendChild(row);
+    });
+    $("playersNone").style.display = S.players.length ? "none" : "block";
+  }
+
+  function renderPlaceholder(text) {
+    S.rendered = false;
+    S.sig = "";
+    S.avatarUuid = "";
+    $("emptyState").textContent = text;
+    $("emptyState").hidden = false;
+    $("invView").classList.add("hidden");
+    $("enderView").classList.add("hidden");
+    $("playerName").textContent = "未选择玩家";
+    $("playerMeta").textContent = "从左侧列表选择一名在线玩家";
+    $("stats").innerHTML = "";
+    $("avatar").removeAttribute("src");
+    $("avatar").style.visibility = "hidden";
+  }
+
+  function render(data) {
+    $("emptyState").hidden = true;
+    $("invView").classList.toggle("hidden", S.type !== "inv");
+    $("enderView").classList.toggle("hidden", S.type !== "ender");
+    renderHeader(data);
+    renderGrids(data);
+    S.sig = gridSignature(data);
+    S.rendered = true;
+  }
+
+  function renderHeader(data) {
+    const p = data.player || {};
+    $("playerName").textContent = p.name || "-";
+    $("playerMeta").textContent = [
+      p.world || "-",
+      `${p.x ?? 0} ${p.y ?? 0} ${p.z ?? 0}`,
+      MODE_LABEL[p.mode] || p.mode || ""
+    ].filter(Boolean).join(" · ");
+
+    if (S.avatarUuid !== p.uuid) {
+      S.avatarUuid = p.uuid;
+      setAvatar($("avatar"), p.uuid, p.name, 48, () => {
+        $("avatar").style.visibility = "hidden";
+      });
+    }
+    $("avatar").style.visibility = "visible";
+
+    $("stats").innerHTML = [
+      `<span>生命 ${fmt(p.health)} / ${fmt(p.maxHealth)}</span>`,
+      `<span>饥饿 ${p.food ?? 0}</span>`,
+      `<span>经验 ${p.level ?? 0}</span>`,
+      `<span>护甲 ${fmt(p.armor)}</span>`
+    ].join("");
+  }
+
+  function gridSignature(data) {
+    return S.type + ":" + JSON.stringify(data.slots || []);
+  }
+
+  function renderGrids(data) {
+    const map = new Map();
+    (data.slots || []).forEach(item => map.set(item.slot, item));
+
+    if (S.type === "inv") {
+      renderGrid("mainCells", range(9, 35), map);
+      renderGrid("hotbarCells", range(0, 8), map);
+      renderGrid("armorCells", [36, 37, 38, 39], map, ARMOR_LABELS);
+      renderGrid("offhandCells", [40], map, ["副手"]);
+    } else {
+      renderGrid("enderCells", range(0, 26), map);
+    }
+  }
+
+  function range(from, to) {
+    const out = [];
+    for (let i = from; i <= to; i++) out.push(i);
+    return out;
+  }
+
+  function renderGrid(id, slots, map, labels) {
+    const container = $(id);
+    container.innerHTML = "";
+    slots.forEach((slot, idx) => {
+      const item = map.get(slot);
+      const cell = document.createElement("div");
+      cell.className = "cell";
+      if (!item) {
+        cell.classList.add("empty");
+        if (labels) {
+          const hint = document.createElement("span");
+          hint.className = "hint";
+          hint.textContent = labels[idx] || "";
+          cell.appendChild(hint);
+        }
+      } else {
+        cell.classList.add("filled");
+        if (item.ench && item.ench.length) cell.classList.add("ench");
+        cell.appendChild(icon(item));
+        if (item.amount > 1) {
+          const count = document.createElement("span");
+          count.className = "count";
+          count.textContent = item.amount;
+          cell.appendChild(count);
+        }
+        if (typeof item.dura === "number" && item.maxDura > 1) {
+          const left = Math.max(0, 1 - item.dura / item.maxDura);
+          const bar = document.createElement("div");
+          bar.className = "dura";
+          const fill = document.createElement("i");
+          fill.style.width = (left * 100).toFixed(1) + "%";
+          fill.style.background = left > 0.5 ? "#3fb950" : left > 0.2 ? "#d29922" : "#f85149";
+          bar.appendChild(fill);
+          cell.appendChild(bar);
+        }
+        bindTip(cell, item);
+      }
+      container.appendChild(cell);
+    });
+  }
+
+  function icon(item) {
+    const wrap = document.createElement("div");
+    wrap.className = "icon";
+    const img = document.createElement("img");
+    img.alt = itemName(item);
+    img.loading = "lazy";
+    img.referrerPolicy = "no-referrer";
+
+    const fallback = document.createElement("div");
+    fallback.className = "fallback";
+    fallback.textContent = (itemName(item) || "?").slice(0, 1);
+
+    const sources = iconSources(item.key);
+    let idx = 0;
+    img.style.display = "none";
+    img.onerror = () => {
+      idx++;
+      if (idx < sources.length) img.src = sources[idx];
+      else { img.style.display = "none"; fallback.style.display = "grid"; }
+    };
+    img.onload = () => { img.style.display = "block"; fallback.style.display = "none"; };
+    img.src = sources[0];
+
+    wrap.append(fallback, img);
+    return wrap;
+  }
+
+  function setAvatar(img, uuid, name, px, onFail) {
+    const sources = [
+      api(`api/skin?player=${encodeURIComponent(uuid)}`),
+      `https://mc-heads.net/avatar/${encodeURIComponent(name || uuid)}/${px}`
+    ];
+    let idx = 0;
+    img.loading = "lazy";
+    img.referrerPolicy = "no-referrer";
+    img.onerror = () => {
+      idx += 1;
+      if (idx < sources.length) {
+        img.src = sources[idx];
+        return;
+      }
+      img.onerror = null;
+      if (onFail) onFail();
+    };
+    img.src = sources[0];
+  }
+
+  function iconSources(key) {
+    const base = (CFG.assetsCdn || "").replace(/\/$/, "") + "/textures";
+    const k = (key || "").toLowerCase();
+    const list = [`${base}/item/${k}.png`];
+    if (/potion$/.test(k)) list.unshift(`${base}/item/potion.png`);
+    list.push(`${base}/block/${k}.png`, `${base}/block/${k}_side.png`, `${base}/block/${k}_top.png`);
+    return list;
+  }
+
+  function bindTip(cell, item) {
+    cell.addEventListener("pointerenter", (ev) => showTip(item, cell, ev));
+    cell.addEventListener("pointermove", (ev) => {
+      if (tip.classList.contains("show")) positionTip(ev);
+    });
+    cell.addEventListener("pointerleave", () => {
+      if (tipOwner === cell) hideTip();
+    });
+  }
+
+  function showTip(item, cell, ev) {
+    tipOwner = cell;
+    tipItem = item;
+    const lines = [`<div class="name">${esc(itemName(item))}${item.amount > 1 ? ` ×${item.amount}` : ""}</div>`];
+    (item.lore || []).forEach(l => lines.push(`<div class="lore">${esc(l)}</div>`));
+    (item.ench || []).forEach(e => lines.push(`<div class="ench">${esc(enchName(e.k))} ${levelText(e.l)}</div>`));
+    if (typeof item.dura === "number" && item.maxDura > 1) {
+      lines.push(`<div class="dura">耐久 ${item.maxDura - item.dura} / ${item.maxDura}</div>`);
+    }
+    if (item.unbreakable) lines.push(`<div class="dura">无法破坏</div>`);
+    lines.push(`<div class="id">${esc(item.key)}</div>`);
+    tip.innerHTML = lines.join("");
+    tip.classList.add("show");
+    positionTip(ev);
+  }
+
+  function positionTip(ev) {
+    const w = tip.offsetWidth;
+    const h = tip.offsetHeight;
+    let x = ev.clientX + 14;
+    let y = ev.clientY + 14;
+    if (x + w > window.innerWidth - 8) x = ev.clientX - w - 14;
+    if (y + h > window.innerHeight - 8) y = ev.clientY - h - 14;
+    tip.style.left = Math.max(6, x) + "px";
+    tip.style.top = Math.max(6, y) + "px";
+  }
+
+  function hideTip() {
+    tip.classList.remove("show");
+    tipOwner = null;
+    tipItem = null;
+  }
+
+  function itemName(item) {
+    if (item.name) return item.name;
+    const k = item.key || "";
+    return S.lang[`item.minecraft.${k}`]
+        || S.lang[`block.minecraft.${k}`]
+        || S.lang[`entity.minecraft.${k}`]
+        || pretty(k);
+  }
+
+  function enchName(key) {
+    return S.lang[`enchantment.minecraft.${key}`] || pretty(key);
+  }
+
+  function levelText(level) {
+    const n = Number(level) || 0;
+    return n <= 10 ? (ROMAN[n] || String(n)) : String(n);
+  }
+
+  function pretty(key) {
+    return String(key || "").split("_")
+      .map(w => w ? w[0].toUpperCase() + w.slice(1) : "")
+      .join(" ");
+  }
+
+  function fmt(v) {
+    const n = Number(v);
+    if (!isFinite(n)) return "0";
+    return Math.abs(n - Math.round(n)) < 0.05 ? String(Math.round(n)) : n.toFixed(1);
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  }
+
+  function updateTime() {
+    const t = new Date();
+    $("updated").textContent = "更新于 " + t.toLocaleTimeString("zh-CN", { hour12: false });
+  }
+
+  function showOverlay(title, text, code) {
+    $("overlayTitle").textContent = title;
+    $("overlayText").textContent = text;
+    const codeEl = $("overlayCode");
+    if (code) { codeEl.style.display = "block"; codeEl.textContent = code; }
+    else codeEl.style.display = "none";
+    $("overlay").classList.add("show");
+    clearTimeout(S.timer);
+  }
+})();
+</script>
+</body>
+</html>
