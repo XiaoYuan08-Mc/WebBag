@@ -351,7 +351,8 @@ window.WB_CFG = {
     fails: 0,
     sig: "",
     rendered: false,
-    avatarUuid: ""
+    avatarUuid: "",
+    wantPlayer: ""
   };
 
   const $ = (id) => document.getElementById(id);
@@ -364,6 +365,7 @@ window.WB_CFG = {
   function boot() {
     const params = new URLSearchParams(location.search);
     S.key = params.get("key") || sessionStorage.getItem("webbag.key") || "";
+    S.wantPlayer = params.get("player") || "";
     if (params.get("key")) {
       sessionStorage.setItem("webbag.key", S.key);
       try {
@@ -689,6 +691,19 @@ window.WB_CFG = {
       });
       list.appendChild(row);
     });
+    if (S.wantPlayer) {
+      const want = S.wantPlayer.toLowerCase();
+      const hit = S.players.find(p => (p.uuid || "").toLowerCase() === want || (p.name || "").toLowerCase() === want);
+      S.wantPlayer = "";
+      if (hit) {
+        S.uuid = hit.uuid;
+        hideTip();
+        renderPlayers();
+        loadInventory();
+        startStream();
+        return;
+      }
+    }
     $("playersNone").textContent = S.scope === "offline" ? "没有找到离线存档" : "当前没有在线玩家";
     $("playersNone").style.display = S.players.length ? "none" : "block";
   }
@@ -829,6 +844,8 @@ window.WB_CFG = {
     fallback.className = "fallback";
     fallback.textContent = (itemName(item) || "?").slice(0, 1);
 
+    const tint = tintColor(item.key);
+
     const sources = iconSources(item.key);
     let idx = 0;
     img.style.display = "none";
@@ -837,7 +854,14 @@ window.WB_CFG = {
       if (idx < sources.length) img.src = sources[idx];
       else { img.style.display = "none"; fallback.style.display = "grid"; }
     };
-    img.onload = () => { img.style.display = "block"; fallback.style.display = "none"; };
+    img.onload = () => {
+      if (tint) {
+        wrap.style.background = tint;
+        img.style.mixBlendMode = "multiply";
+      }
+      img.style.display = "block";
+      fallback.style.display = "none";
+    };
     img.src = sources[0];
 
     wrap.append(fallback, img);
@@ -864,13 +888,29 @@ window.WB_CFG = {
     img.src = sources[0];
   }
 
-  function iconSources(key) {
-    const base = (CFG.assetsCdn || "").replace(/\/$/, "") + "/textures";
+  const DYE_HEX = {
+    white: "", orange: "#f9801d", magenta: "#c74ebd", light_blue: "#3ab3da",
+    yellow: "#fed83d", lime: "#80c71f", pink: "#f38baa", gray: "#474f52",
+    light_gray: "#9d9d97", cyan: "#169c9c", purple: "#8932b8", blue: "#3c44aa",
+    brown: "#835432", green: "#5e7c16", red: "#b02e26", black: "#1d1d21"
+  };
+
+  /** 染色类物品的原版贴图是灰白底，网页端按染料颜色叠色。 */
+  function tintColor(key) {
     const k = (key || "").toLowerCase();
-    const list = [`${base}/item/${k}.png`];
-    if (/potion$/.test(k)) list.unshift(`${base}/item/potion.png`);
-    list.push(`${base}/block/${k}.png`, `${base}/block/${k}_side.png`, `${base}/block/${k}_top.png`);
-    return list;
+    if (/^leather_(helmet|chestplate|leggings|boots|horse_armor)$/.test(k)) {
+      return "#a06540";
+    }
+    const m = k.match(/^(\w+)_banner$/);
+    if (!m) {
+      return "";
+    }
+    return DYE_HEX[m[1]] || "";
+  }
+
+  function iconSources(key) {
+    const k = (key || "").toLowerCase();
+    return [api(`api/tex?id=${encodeURIComponent(k)}`)];
   }
 
   function bindTip(cell, item) {

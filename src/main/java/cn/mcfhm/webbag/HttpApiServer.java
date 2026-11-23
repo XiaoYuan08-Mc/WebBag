@@ -48,11 +48,13 @@ public final class HttpApiServer {
     private final Map<String, RateWindow> rateWindows = new ConcurrentHashMap<>();
     private final Semaphore streamSlots = new Semaphore(16);
     private final Skins skins;
+    private final Textures textures;
 
     public HttpApiServer(WebBagPlugin plugin, AccessKey accessKey) {
         this.plugin = plugin;
         this.accessKey = accessKey;
         this.skins = new Skins(plugin);
+        this.textures = new Textures(plugin);
     }
 
     public void setAccessKey(AccessKey accessKey) {
@@ -75,6 +77,7 @@ public final class HttpApiServer {
             server.createContext("/api/players", this::handlePlayers);
             server.createContext("/api/inventory", this::handleInventory);
             server.createContext("/api/skin", this::handleSkin);
+            server.createContext("/api/tex", this::handleTexture);
             server.createContext("/api/stream", this::handleStream);
             server.createContext("/api/lang", this::handleLang);
             server.createContext("/health", this::handleHealth);
@@ -221,6 +224,41 @@ public final class HttpApiServer {
             return;
         }
         respond(exchange, 200, "application/json; charset=utf-8", json.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /** 物品贴图：由服务端取并缓存，浏览器不直接访问外部 CDN。 */
+    private void handleTexture(HttpExchange exchange) throws IOException {
+        if (!allow(ipOf(exchange))) {
+            respondJson(exchange, 429, errorJson("rate_limited", "请求过于频繁。"));
+            return;
+        }
+        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            respondJson(exchange, 405, errorJson("method_not_allowed", "只支持 GET。"));
+            return;
+        }
+        Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
+        if (!authorized(exchange, query)) {
+            respondJson(exchange, 401, errorJson("invalid_key", "访问口令无效。"));
+            return;
+        }
+        String key = query.getOrDefault("id", "").toLowerCase(java.util.Locale.ROOT);
+        if (!Textures.validKey(key)) {
+            respondJson(exchange, 400, errorJson("bad_key", "贴图名不合法。"));
+            return;
+        }
+        byte[] png = textures.get(key);
+        if (png == null) {
+            respondJson(exchange, 404, errorJson("no_texture", "没有这张贴图。"));
+            return;
+        }
+        exchange.getResponseHeaders().set("Content-Type", "image/png");
+        exchange.getResponseHeaders().set("Cache-Control", "public, max-age=2592000");
+        exchange.getResponseHeaders().set("X-Content-Type-Options", "nosniff");
+        exchange.sendResponseHeaders(200, png.length);
+        try (OutputStream out = exchange.getResponseBody()) {
+            out.write(png);
+        }
+        exchange.close();
     }
 
     /** 玩家当前皮肤的头像（64×64 PNG）。 */

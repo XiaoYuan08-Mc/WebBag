@@ -6,7 +6,7 @@ Purpur / Paper 26.3 的插件，用浏览器看服务器上玩家的背包和末
 
 ## 安装
 
-把 `WebBag-1.4.0.jar` 丢进 `plugins/`，重启。游戏里敲 `/webbag link`，聊天栏会给一条带口令的网址，浏览器打开就能看。左边是玩家列表，点谁看谁。
+把 `WebBag-1.4.1.jar` 丢进 `plugins/`，重启。游戏里敲 `/webbag link`，聊天栏会给一条带口令的网址，浏览器打开就能看。左边是玩家列表，点谁看谁。
 
 口令第一次访问后存在 Cookie 里（30 天），之后直接 `http://服务器IP:5001` 就行。口令自动生成在 `plugins/WebBag/config.yml`。
 
@@ -50,9 +50,10 @@ Purpur / Paper 26.3 的插件，用浏览器看服务器上玩家的背包和末
 - `/api/inventory?player=<uuid>&type=inv|ender` 背包 / 末影箱
 - `/api/inventory?player=<uuid>&type=inv|ender&offline=1` 读存档的背包 / 末影箱
 - `/api/skin?player=<uuid>` 当前皮肤裁出的 64×64 头像
+- `/api/tex?id=<物品名>` 物品图标 PNG，服务端取图后缓存在 `plugins/WebBag/cache/tex/`
 - `/api/stream?player=<uuid>&type=inv|ender` SSE 实时流，只在在线玩家用
 
-槽位和原版一致：0–8 快捷栏，9–35 主背包，36–39 装备，40 副手。地址后面加 `&scope=offline` 可以直接打开离线页。
+槽位和原版一致：0–8 快捷栏，9–35 主背包，36–39 装备，40 副手。地址后面加 `&scope=offline` 可以直接打开离线页，`&player=<uuid 或玩家名>` 直接打开某个人的背包。
 
 ## 注意
 
