@@ -5,6 +5,7 @@ import net.kyori.adventure.text.event.ClickEvent;
 import net.kyori.adventure.text.event.HoverEvent;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandSender;
 import org.bukkit.entity.Player;
@@ -13,11 +14,13 @@ import org.bukkit.plugin.java.JavaPlugin;
 import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
+import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
 
@@ -179,6 +182,101 @@ public final class WebBagPlugin extends JavaPlugin {
             }
         });
         return future;
+    }
+
+    /** 离线玩家列表：直接扫存档文件，按最后保存时间倒序。 */
+    public CompletableFuture<String> captureOfflinePlayersAsync() {
+        CompletableFuture<String> future = new CompletableFuture<>();
+        Bukkit.getScheduler().runTask(this, () -> {
+            List<Path> dirs = OfflineData.playerdataDirs();
+            Map<String, String> names = OfflineData.userCache();
+            Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+                try {
+                    List<OfflineEntry> entries = new ArrayList<>();
+                    for (Path file : OfflineData.playerFiles(dirs)) {
+                        UUID uuid = OfflineData.uuidOf(file);
+                        if (uuid == null) {
+                            continue;
+                        }
+                        String id = uuid.toString();
+                        String name = names.get(id);
+                        if (name == null) {
+                            name = id.substring(0, 8);
+                        }
+                        entries.add(new OfflineEntry(uuid, name, OfflineData.lastModified(file)));
+                    }
+                    entries.sort(Comparator.comparingLong(OfflineEntry::lastSeen).reversed());
+
+                    Json json = new Json(8192);
+                    json.beginObject();
+                    json.name("ok").value(true);
+                    json.name("offline").value(true);
+                    json.name("time").value(System.currentTimeMillis());
+                    json.name("count").value(entries.size());
+                    json.name("players").beginArray();
+                    int limit = Math.min(entries.size(), 300);
+                    for (int i = 0; i < limit; i++) {
+                        OfflineEntry e = entries.get(i);
+                        json.beginObject();
+                        json.name("name").value(e.name());
+                        json.name("uuid").value(e.uuid().toString());
+                        json.name("world").value("-");
+                        json.name("mode").value("-");
+                        json.name("health").value(0.0);
+                        json.name("lastSeen").value(e.lastSeen());
+                        json.endObject();
+                    }
+                    json.endArray();
+                    json.endObject();
+                    future.complete(json.toString());
+                } catch (Throwable t) {
+                    future.completeExceptionally(t);
+                }
+            });
+        });
+        return future;
+    }
+
+    /** 离线玩家背包：直接读 playerdata，不依赖玩家在线。找不到存档返回空串。 */
+    public CompletableFuture<String> captureOfflineAsync(UUID uuid, String nameHint, boolean ender) {
+        CompletableFuture<String> future = new CompletableFuture<>();
+        Bukkit.getScheduler().runTask(this, () -> {
+            List<Path> dirs = OfflineData.playerdataDirs();
+            String hint = nameHint != null && !nameHint.isBlank() ? nameHint.trim() : null;
+            String name = hint;
+            if (name == null) {
+                name = OfflineData.userCache().get(uuid.toString());
+            }
+            if (name == null) {
+                name = displayName(Bukkit.getOfflinePlayer(uuid));
+            }
+            final String display = name;
+            Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
+                try {
+                    Path file = OfflineData.find(dirs, uuid);
+                    if (file == null) {
+                        future.complete(null);
+                        return;
+                    }
+                    future.complete(OfflineData.snapshot(display, uuid, file, ender));
+                } catch (Throwable t) {
+                    future.completeExceptionally(t);
+                }
+            });
+        });
+        return future;
+    }
+
+    private record OfflineEntry(UUID uuid, String name, long lastSeen) {
+    }
+
+    private static String displayName(OfflinePlayer player) {
+        String name = player.getName();
+        if (name != null && !name.isBlank()) {
+            return name;
+        }
+        String uuid = player.getUniqueId().toString();
+        return uuid.substring(0, 8);
     }
 
     public static String detectLocalAddress() {

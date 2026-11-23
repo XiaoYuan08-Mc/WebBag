@@ -3,7 +3,7 @@ plugins {
 }
 
 group = "cn.mcfhm"
-version = "1.3.1"
+version = "1.4.0"
 
 repositories {
     maven("https://repo.purpurmc.org/snapshots")

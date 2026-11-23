@@ -161,7 +161,11 @@ public final class HttpApiServer {
             return;
         }
 
-        CompletableFuture<String> future = plugin.capturePlayersAsync();
+        Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
+
+        CompletableFuture<String> future = isTrue(query.get("offline"))
+                ? plugin.captureOfflinePlayersAsync()
+                : plugin.capturePlayersAsync();
         respondFuture(exchange, future);
     }
 
@@ -195,12 +199,15 @@ public final class HttpApiServer {
             return;
         }
 
-        CompletableFuture<String> future = plugin.captureAsync(uuid, ender);
+        boolean offline = isTrue(query.get("offline"));
+        CompletableFuture<String> future = offline
+                ? plugin.captureOfflineAsync(uuid, query.get("name"), ender)
+                : plugin.captureAsync(uuid, ender);
         String json;
         try {
-            json = future.get(5, TimeUnit.SECONDS);
+            json = future.get(8, TimeUnit.SECONDS);
         } catch (TimeoutException e) {
-            respondJson(exchange, 504, errorJson("timeout", "服务器主线程繁忙，请稍后重试。"));
+            respondJson(exchange, 504, errorJson("timeout", "读取背包超时，请稍后重试。"));
             return;
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to build inventory snapshot: " + e);
@@ -208,7 +215,9 @@ public final class HttpApiServer {
             return;
         }
         if (json == null) {
-            respondJson(exchange, 404, errorJson("player_offline", "该玩家已离线。"));
+            respondJson(exchange, 404, offline
+                    ? errorJson("no_data", "没有找到该玩家的存档文件。")
+                    : errorJson("player_offline", "该玩家已离线。"));
             return;
         }
         respond(exchange, 200, "application/json; charset=utf-8", json.getBytes(StandardCharsets.UTF_8));
@@ -508,8 +517,11 @@ public final class HttpApiServer {
         return map;
     }
 
-    private static String errorJson(String code, String message) {
-        Json json = new Json(256);
+    private static boolean isTrue(String value) {
+        return value != null && ("1".equals(value) || "true".equalsIgnoreCase(value) || "yes".equalsIgnoreCase(value));
+    }
+
+    private static String errorJson(String code, String message) {        Json json = new Json(256);
         json.beginObject();
         json.name("ok").value(false);
         json.name("error").value(code);

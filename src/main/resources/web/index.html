@@ -58,10 +58,21 @@
     background:var(--panel);border:1px solid var(--line);border-radius:8px;
     padding:12px;max-height:calc(100vh - 120px);overflow:auto;
   }
+  .players .head{
+    display:flex;align-items:center;justify-content:space-between;
+    gap:8px;padding:0 8px 8px;
+  }
   .players h3{
     font-size:12px;font-weight:500;color:var(--muted);
-    padding:0 8px 8px;
   }
+  .seg{display:flex;gap:2px}
+  .seg button{
+    font:inherit;font-size:12px;color:var(--muted);
+    background:none;border:none;border-radius:4px;
+    padding:2px 7px;cursor:pointer;
+  }
+  .seg button:hover{color:var(--text)}
+  .seg button.on{color:var(--text);background:var(--panel-2)}
   .players ul{list-style:none}
   .prow{
     display:flex;align-items:center;gap:9px;
@@ -238,7 +249,13 @@
 
 <main class="layout">
   <aside class="players">
-    <h3>在线玩家</h3>
+    <div class="head">
+      <h3 id="listTitle">在线玩家</h3>
+      <div class="seg" id="scope">
+        <button class="on" data-scope="online">在线</button>
+        <button data-scope="offline">离线</button>
+      </div>
+    </div>
     <ul id="playerList"></ul>
     <div class="none" id="playersNone">当前没有在线玩家</div>
   </aside>
@@ -321,6 +338,7 @@ window.WB_CFG = {
 
   const S = {
     key: "",
+    scope: "online",
     players: [],
     uuid: "",
     type: "inv",
@@ -359,6 +377,8 @@ window.WB_CFG = {
       $("tabEnder").hidden = true;
     }
 
+    if (params.get("scope") === "offline") setScope("offline", false);
+
     document.querySelectorAll(".tab").forEach(tab => {
       tab.addEventListener("click", () => {
         if (S.type === tab.dataset.type) return;
@@ -375,6 +395,10 @@ window.WB_CFG = {
     $("refresh").addEventListener("click", () => refreshAll(true));
     document.addEventListener("click", hideTip);
 
+    document.querySelectorAll("#scope button").forEach(btn => {
+      btn.addEventListener("click", () => setScope(btn.dataset.scope, true));
+    });
+
     if (!S.key) {
       showOverlay("链接缺少访问口令", "请在游戏内以管理员身份执行 /webbag，使用它给出的链接打开。", "/webbag");
       return;
@@ -387,8 +411,27 @@ window.WB_CFG = {
     });
   }
 
-  function api(path) {
-    if (!S.key) return path;
+  function setScope(scope, reload) {
+    if (S.scope === scope && reload) return;
+    S.scope = scope;
+    document.querySelectorAll("#scope button").forEach(b => b.classList.toggle("on", b.dataset.scope === scope));
+    $("listTitle").textContent = scope === "offline" ? "离线玩家" : "在线玩家";
+    S.uuid = "";
+    S.data = null;
+    S.rendered = false;
+    S.sig = "";
+    S.players = [];
+    stopStream();
+    clearTimeout(S.timer);
+    hideTip();
+    if (reload) {
+      renderPlaceholder(scope === "offline" ? "正在读取离线存档" : "正在读取在线玩家");
+      S.busy = false;
+      refreshAll();
+    }
+  }
+
+  function api(path) {    if (!S.key) return path;
     return path + (path.indexOf("?") >= 0 ? "&" : "?") + "key=" + encodeURIComponent(S.key);
   }
 
@@ -406,7 +449,7 @@ window.WB_CFG = {
     S.busy = true;
     $("refresh").disabled = true;
     try {
-      const res = await fetch(api("api/players"));
+      const res = await fetch(api(S.scope === "offline" ? "api/players?offline=1" : "api/players"));
       const data = await res.json().catch(() => null);
       if (!res.ok || !data || data.ok !== true) {
         setStatus(false, "读取失败");
@@ -415,14 +458,15 @@ window.WB_CFG = {
       }
       S.players = data.players || [];
       setStatus(true, "已连接");
-      $("online").textContent = `在线 ${data.count ?? S.players.length} 人`;
+      $("online").textContent = `${S.scope === "offline" ? "离线" : "在线"} ${data.count ?? S.players.length} 人`;
 
       if (!S.uuid || !S.players.some(p => p.uuid === S.uuid)) {
         S.uuid = S.players.length ? S.players[0].uuid : "";
       }
       renderPlayers();
       await loadInventory();
-      startStream();
+      if (S.scope === "online") startStream();
+      else stopStream();
     } catch (e) {
       setStatus(false, "连接失败");
       showOverlay("无法连接服务器", "网页服务未启动或链接已失效，请重新执行 /webbag。", "/webbag");
@@ -436,15 +480,22 @@ window.WB_CFG = {
   async function loadInventory() {
     if (!S.uuid) {
       S.data = null;
-      renderPlaceholder("当前没有在线玩家");
+      renderPlaceholder(S.scope === "offline" ? "没有可查询的离线玩家" : "当前没有在线玩家");
       showNotice("");
       updateTime();
       return;
     }
-    const res = await fetch(api(`api/inventory?player=${encodeURIComponent(S.uuid)}&type=${S.type}`));
+    const off = S.scope === "offline" ? `&offline=1&name=${encodeURIComponent(playerName(S.uuid))}` : "";
+    const res = await fetch(api(`api/inventory?player=${encodeURIComponent(S.uuid)}&type=${S.type}${off}`));
     const data = await res.json().catch(() => null);
     if (!res.ok || !data || data.ok !== true) {
       if (res.status === 404) {
+        if (S.scope === "offline") {
+          showNotice("没有找到该玩家的存档文件");
+          S.data = null;
+          renderPlaceholder("该玩家没有存档");
+          return;
+        }
         showNotice("该玩家已离线，正在刷新列表");
         S.data = null;
         renderPlaceholder("该玩家已离线");
@@ -480,6 +531,7 @@ window.WB_CFG = {
 
   function startStream() {
     stopStream();
+    if (S.scope === "offline") return;
     if (!CFG.live || !S.uuid) return;
     const es = new EventSource(api(`api/stream?player=${encodeURIComponent(S.uuid)}&type=${S.type}`));
     S.es = es;
@@ -553,6 +605,10 @@ window.WB_CFG = {
 
   function schedule() {
     clearTimeout(S.timer);
+    if (S.scope === "offline") {
+      $("countdown").textContent = "离线存档 · 点刷新重读";
+      return;
+    }
     if (CFG.refresh <= 0 && !CFG.live) {
       $("countdown").textContent = "";
       return;
@@ -618,7 +674,9 @@ window.WB_CFG = {
       name.textContent = p.name;
       const world = document.createElement("div");
       world.className = "world";
-      world.textContent = `${p.world || "-"} · ${MODE_LABEL[p.mode] || p.mode || ""}`;
+      world.textContent = S.scope === "offline"
+        ? `最后在线 ${shortTime(p.lastSeen)}`
+        : `${p.world || "-"} · ${MODE_LABEL[p.mode] || p.mode || ""}`;
       info.append(name, world);
 
       row.append(img, letter, info);
@@ -631,6 +689,7 @@ window.WB_CFG = {
       });
       list.appendChild(row);
     });
+    $("playersNone").textContent = S.scope === "offline" ? "没有找到离线存档" : "当前没有在线玩家";
     $("playersNone").style.display = S.players.length ? "none" : "block";
   }
 
@@ -643,7 +702,7 @@ window.WB_CFG = {
     $("invView").classList.add("hidden");
     $("enderView").classList.add("hidden");
     $("playerName").textContent = "未选择玩家";
-    $("playerMeta").textContent = "从左侧列表选择一名在线玩家";
+    $("playerMeta").textContent = S.scope === "offline" ? "从左侧列表选择一名离线玩家" : "从左侧列表选择一名在线玩家";
     $("stats").innerHTML = "";
     $("avatar").removeAttribute("src");
     $("avatar").style.visibility = "hidden";
@@ -662,11 +721,15 @@ window.WB_CFG = {
   function renderHeader(data) {
     const p = data.player || {};
     $("playerName").textContent = p.name || "-";
-    $("playerMeta").textContent = [
+    const parts = [
       p.world || "-",
       `${p.x ?? 0} ${p.y ?? 0} ${p.z ?? 0}`,
       MODE_LABEL[p.mode] || p.mode || ""
-    ].filter(Boolean).join(" · ");
+    ];
+    if (data.offline) {
+      parts.push(`存档于 ${shortTime(data.lastSeen)}`);
+    }
+    $("playerMeta").textContent = parts.filter(Boolean).join(" · ");
 
     if (S.avatarUuid !== p.uuid) {
       S.avatarUuid = p.uuid;
@@ -682,6 +745,11 @@ window.WB_CFG = {
       `<span>经验 ${p.level ?? 0}</span>`,
       `<span>护甲 ${fmt(p.armor)}</span>`
     ].join("");
+  }
+
+  function playerName(uuid) {
+    const p = S.players.find(x => x.uuid === uuid);
+    return p ? (p.name || "") : "";
   }
 
   function gridSignature(data) {
@@ -870,6 +938,14 @@ window.WB_CFG = {
     return String(key || "").split("_")
       .map(w => w ? w[0].toUpperCase() + w.slice(1) : "")
       .join(" ");
+  }
+
+  function shortTime(ms) {
+    const n = Number(ms);
+    if (!isFinite(n) || n <= 0) return "未知";
+    const d = new Date(n);
+    const pad = v => String(v).padStart(2, "0");
+    return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
   }
 
   function fmt(v) {
