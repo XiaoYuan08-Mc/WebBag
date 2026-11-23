@@ -117,6 +117,10 @@ final class Snapshot {
         json.beginObject();
         json.name("slot").value(slot);
         json.name("key").value(material.getKey().getKey());
+        String icon = Textures.icon(material.getKey().getKey());
+        if (icon != null) {
+            json.name("icon").value(icon);
+        }
         json.name("amount").value(item.getAmount());
         json.name("max").value(Math.max(1, material.getMaxStackSize()));
         json.name("name").value(displayName(meta));

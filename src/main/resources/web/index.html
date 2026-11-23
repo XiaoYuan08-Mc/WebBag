@@ -849,7 +849,7 @@ window.WB_CFG = {
 
     const tint = tintColor(item.key);
 
-    const sources = iconSources(item.key);
+    const sources = iconSources(item);
     let idx = 0;
     img.style.display = "none";
     img.onerror = () => {
@@ -911,9 +911,11 @@ window.WB_CFG = {
     return DYE_HEX[m[1]] || "";
   }
 
-  function iconSources(key) {
-    const k = (key || "").toLowerCase();
-    return [api(`api/tex?id=${encodeURIComponent(k)}`)];
+  function iconSources(item) {
+    if (item && item.icon) {
+      return [item.icon];
+    }
+    return [api(`api/tex?id=${encodeURIComponent((item && item.key) || "")}`)];
   }
 
   function bindTip(cell, item) {

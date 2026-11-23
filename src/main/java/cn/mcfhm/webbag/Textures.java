@@ -28,10 +28,55 @@ final class Textures {
             .build();
     private final Set<String> missing = ConcurrentHashMap.newKeySet();
     private final java.util.Map<String, byte[]> bundled = new java.util.concurrent.ConcurrentHashMap<>();
+    private final java.util.Map<String, String> uriCache = new java.util.concurrent.ConcurrentHashMap<>();
     private volatile boolean bundleLoaded;
+
+    private static volatile Textures instance;
+
+    /** 背包 JSON 里直接塞图标，省掉一次图片请求。 */
+    static String icon(String key) {
+        Textures t = instance;
+        return t == null ? null : t.dataUri(key);
+    }
+
+    private String dataUri(String key) {
+        if (key == null || !validKey(key)) {
+            return null;
+        }
+        String cached = uriCache.get(key);
+        if (cached != null) {
+            return cached.isEmpty() ? null : cached;
+        }
+        byte[] png = null;
+        for (String relative : candidates(key)) {
+            png = fromBundle(relative);
+            if (png != null) {
+                break;
+            }
+        }
+        String uri = png == null ? "" : "data:image/png;base64,"
+                + java.util.Base64.getEncoder().encodeToString(png);
+        uriCache.put(key, uri);
+        return uri.isEmpty() ? null : uri;
+    }
+
+    /** 自检：jar 内贴图是否加载、某个物品能不能取到图。 */
+    static String diag(String key) {
+        Textures t = instance;
+        if (t == null) {
+            return "{\"bundle\":0,\"loaded\":false}";
+        }
+        t.loadBundle();
+        String uri = t.dataUri(key == null || key.isBlank() ? "diamond_sword" : key);
+        return "{\"bundle\":" + t.bundled.size()
+                + ",\"sampleKey\":\"" + (key == null || key.isBlank() ? "diamond_sword" : key) + "\""
+                + ",\"sampleBytes\":" + (uri == null ? 0 : uri.length())
+                + "}";
+    }
 
     Textures(WebBagPlugin plugin) {
         this.plugin = plugin;
+        instance = this;
         this.cacheDir = plugin.getDataFolder().toPath().resolve("cache").resolve("tex");
         try {
             Files.createDirectories(cacheDir);

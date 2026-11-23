@@ -223,6 +223,10 @@ final class OfflineData {
         json.beginObject();
         json.name("slot").value(slot);
         json.name("key").value(key);
+        String icon = Textures.icon(key);
+        if (icon != null) {
+            json.name("icon").value(icon);
+        }
         json.name("amount").value(amount);
         json.name("max").value(Math.max(1, material.getMaxStackSize()));
 

@@ -78,6 +78,7 @@ public final class HttpApiServer {
             server.createContext("/api/inventory", this::handleInventory);
             server.createContext("/api/skin", this::handleSkin);
             server.createContext("/api/tex", this::handleTexture);
+            server.createContext("/api/diag", this::handleDiag);
             server.createContext("/api/stream", this::handleStream);
             server.createContext("/api/lang", this::handleLang);
             server.createContext("/health", this::handleHealth);
@@ -261,6 +262,23 @@ public final class HttpApiServer {
             out.write(png);
         }
         exchange.close();
+    }
+
+    /** 自检接口：贴图包加载情况和示例物品。 */
+    private void handleDiag(HttpExchange exchange) throws IOException {
+        if (!"GET".equalsIgnoreCase(exchange.getRequestMethod())) {
+            respondJson(exchange, 405, errorJson("method_not_allowed", "只支持 GET。"));
+            return;
+        }
+        Map<String, String> query = parseQuery(exchange.getRequestURI().getRawQuery());
+        if (!authorized(exchange, query)) {
+            respondJson(exchange, 401, errorJson("invalid_key", "访问口令无效。"));
+            return;
+        }
+        String tex = Textures.diag(query.get("id"));
+        String body = "{\"version\":\"" + plugin.getPluginMeta().getVersion()
+                + "\",\"textures\":" + tex + "}";
+        respondJson(exchange, 200, body);
     }
 
     /** 玩家当前皮肤的头像（64×64 PNG）。 */
