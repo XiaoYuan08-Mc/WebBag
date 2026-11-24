@@ -1,97 +1,84 @@
 # WebBag
 
-Purpur / Paper 26.3 的插件，用浏览器看服务器上玩家的背包和末影箱，在线的、离线的都能看。只读，动不了任何物品。在线玩家实时刷新，玩家进出、换装备、丢东西都跟着变；离线玩家读存档文件，显示的是他下线上一次保存的状态。名字和头像取自玩家皮肤。
+用浏览器查看服务器玩家的背包和末影箱，在线离线都能看。只读，不能改任何物品。
 
+支持 Purpur / Paper 26.3。
 
+在线玩家每秒刷新，进出服、换装备、丢东西都会跟着变。离线玩家直接读存档文件，看到的是上次保存的状态。名字和头像取自玩家皮肤。
 
 ![界面预览](docs/preview.png)
 
 ## 安装
 
-把 `WebBag-1.5.0.jar` 丢进 `plugins/`，重启。游戏里敲 `/webbag link`，聊天栏会给一条带口令的网址，浏览器打开就能看。左边是玩家列表，点谁看谁。
+把 `WebBag-1.5.1.jar` 放进 `plugins/`，重启。游戏里执行 `/webbag link`，聊天栏会给一条带口令的网址，浏览器打开就能用。左侧是玩家列表，点谁看谁。
 
-口令第一次访问后存在 Cookie 里（30 天），之后直接 `http://服务器IP:5001` 就行。口令自动生成在 `plugins/WebBag/config.yml`。
+口令第一次访问后会存进 Cookie，30 天内不用再带。口令自动生成在 `plugins/WebBag/config.yml`。
 
 ## 离线玩家
 
-列表左上角有「在线 / 离线」切换。离线页直接扫 `world/players`、`world/players/data`（26.3 的玩家档案实际在 `data` 子目录里）、`world/playerdata`（旧版）里的存档文件，列出所有有存档的玩家，按最后保存时间倒序，点开看那个时候的背包、装备和末影箱。名字取自 `usercache.json`，字段顺序不同的格式也认。
+列表左上角可以切「在线 / 离线」。离线页会扫 `world/players`、`world/players/data`、`world/playerdata` 里的存档，按最后保存时间倒序排列，点开看当时的背包、装备和末影箱。名字取自 `usercache.json`。
 
-离线数据是静态的，不推流，页面上点「刷新」重新读一次。服务器里没有存档文件的玩家不会出现在离线列表里。
+离线数据是静态的，点「刷新」重新读一次。没有存档文件的玩家不会出现在列表里。
 
-## 指令
+## 命令
 
+- `/webbag`：当前网址和在线人数
+- `/webbag link`：带口令的完整网址
+- `/webbag key` / `newkey`：查看或更换口令，换完旧链接失效
+- `/webbag status`：端口、监听地址、在线人数
+- `/webbag reload`：重载配置
+- `/webbag selftest`：输出一份样例背包 JSON 和图标覆盖率
 
-
-* `/webbag` 当前网址和在线人数
-
-* `/webbag link` 带口令的完整网址
-
-* `/webbag key` / `newkey` 看口令 / 换口令（换完旧链接失效）
-
-* `/webbag status` 端口、监听地址、在线人数
-
-* `/webbag reload` 重载配置
-
-* `/webbag selftest` 打一份样例背包 JSON，并报一次图标覆盖率，排查贴图用
-
-别名 `/wbag`、`/wbg`，权限 `webbag.admin`，默认仅 OP。
+别名 `/wbag`、`/wbg`，权限 `webbag.admin`，默认只有 OP。
 
 ## 配置
 
-`plugins/WebBag/config.yml`，常改的就几项：
+`plugins/WebBag/config.yml`：
 
+- `port`：默认 5001
+- `bind`：默认 0.0.0.0，只走反代时改 127.0.0.1
+- `public-url`：对外网址，留空则用本机内网 IP
+- `access-key`：访问口令，留空时首次启动自动生成
+- `live-update` / `live-interval-ms`：实时推送开关和间隔
+- `refresh-seconds`：实时推送不可用时的备用轮询间隔，0 关闭
+- `allow-ender-chest`：是否允许看末影箱
+- `assets-cdn` / `assets-version`：语言文件来源，版本要和服务端对上
 
-
-* `port` 5001、`bind` 0.0.0.0
-
-* `public-url` 对外网址，留空就用本机内网 IP
-
-* `access-key` 口令，留空自动生成
-
-* `live-update` 实时推送开关，`live-interval-ms` 推送间隔（默认 1 秒）
-
-* `refresh-seconds` 兜底轮询，默认 10 秒，`0` 关掉
-
-* `allow-ender-chest` 末影箱页签
-
-* `assets-cdn` / `assets-version` 语言文件来源（图标已经打包在 jar 里，不依赖它），版本要跟服务端对上
-
-改完 `/webbag reload`，动端口得重启。
+改完 `/webbag reload`，改端口要重启。
 
 ## 接口
 
-除 `/health` 和 `/api/lang`，都要带 `key` 参数或 Cookie。
+除了 `/health` 和 `/api/lang`，都要带 `key` 参数或 Cookie。
 
+- `/api/players`：在线玩家
+- `/api/players?offline=1`：离线玩家
+- `/api/inventory?player=<uuid>&type=inv|ender`：背包或末影箱
+- `/api/skin?player=<uuid>`：皮肤头像
+- `/api/tex?id=<物品名>`：物品图标
+- `/api/diag`：图标覆盖率自检
+- `/api/stream?player=<uuid>&type=inv|ender`：SSE 实时流
 
-
-* `/api/players` 在线玩家：名字、UUID、世界、模式、生命
-
-* `/api/players?offline=1` 离线玩家：名字、UUID、最后保存时间
-
-* `/api/inventory?player=<uuid>&type=inv|ender` 背包 / 末影箱
-
-* `/api/inventory?player=<uuid>&type=inv|ender&offline=1` 读存档的背包 / 末影箱
-
-* `/api/skin?player=<uuid>` 当前皮肤裁出的 64×64 头像
-
-* `/api/tex?id=<物品名>` 物品图标 PNG，直接读 jar 内的原版贴图，不联网
-
-* `/api/diag` 自检：版本、内置贴图数量、示例图字节数、全部物品的图标覆盖率；加 `&full=1` 列出所有拿不到图标的物品
-
-* `/api/stream?player=<uuid>&type=inv|ender` SSE 实时流，只在在线玩家用
-
-槽位和原版一致：0–8 快捷栏，9–35 主背包，36–39 装备，40 副手。地址后面加 `&scope=offline` 可以直接打开离线页，`&player=<uuid 或玩家名>` 直接打开某个人的背包。
+槽位和原版一致：0 到 8 快捷栏，9 到 35 主背包，36 到 39 装备，40 副手。地址后面加 `&scope=offline` 打开离线页，加 `&player=` 直接打开某个人的背包。
 
 ## 图标
 
-图标不再由浏览器单独请求：生成背包 JSON 时就把图标的 base64 内联进每条物品，页面只发一次数据，不连外网、不受缓存和限流影响。贴图全部来自 jar 里的 `textures.zip`（26.3 原版 2242 张）。
+图标在生成背包 JSON 时就以内联 base64 一起返回，页面不用再逐张请求。贴图来自 jar 里的 `textures.zip`，不连外网。
 
-台阶、楼梯、栅栏、墙、栅栏门、地毯、床这些在原版里是立体模型，没有平面贴图，会退回用主方块（木板 / 羊毛 / 混凝土…）的贴图；实在没有图的（玩家头颅、珊瑚扇这类）显示首字占位，不会空一块。当前覆盖率 1616/1812，用 `/api/diag` 可以看具体数字和缺哪些。
+台阶、楼梯、栅栏、床这类立体模型没有平面贴图，会退回用主方块贴图；玩家头颅、珊瑚扇这类找不到图的显示首字占位。
 
-## 注意
+## 安全
 
-接口只读，没有写入口。离线读的是磁盘上的存档，玩家在线时读到的是他上一次存盘的状态，不是当前背包。口令 24 位随机，只走 HttpOnly Cookie，页面加载后会把网址里的 `?key=` 抹掉。单个 IP 默认每分钟 180 次请求，贴图和头像单独算额度（不占这 180 次）。要开公网就套 Nginx + HTTPS，把 `bind` 改 127.0.0.1。
+接口没有写入口。离线读的是磁盘存档，在线玩家读的是上一次存盘的状态，不一定是最新背包。
+
+口令 24 位随机，只放在 HttpOnly Cookie 里，页面加载后会把地址栏里的 `?key=` 去掉。单个 IP 默认每分钟 180 次请求，图标和头像单独计数。
+
+要开公网就套 Nginx + HTTPS，并把 `bind` 改成 127.0.0.1。
 
 ## 构建
 
-JDK 25 加 Gradle 8，`gradle build`，产物在 `build/libs/`。
+```powershell
+& 'D:\scoop\apps\gradle\current\bin\gradle.bat' -p 'G:\插件\WebBag' build --console=plain `
+  '-Dorg.gradle.java.installations.paths=D:\mo-jdk\jdk-25.0.5+8'
+```
+
+需要 JDK 25，产物在 `build/libs/`。

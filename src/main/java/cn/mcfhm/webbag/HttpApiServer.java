@@ -98,7 +98,7 @@ public final class HttpApiServer {
             server.start();
             return true;
         } catch (Exception e) {
-            plugin.getLogger().severe("Failed to bind " + settings.bind() + ":" + settings.port() + ": " + e.getMessage());
+            plugin.getLogger().severe("端口绑定失败 " + settings.bind() + ":" + settings.port() + ": " + e.getMessage());
             stop();
             return false;
         }
@@ -123,7 +123,7 @@ public final class HttpApiServer {
         WebBagPlugin.Settings settings = plugin.settings();
         try (InputStream in = plugin.getResource("web/index.html")) {
             if (in == null) {
-                pageHtml = "<!doctype html><meta charset=\"utf-8\"><title>WebBag</title><h1>missing web/index.html</h1>";
+                pageHtml = "<!doctype html><meta charset=\"utf-8\"><title>WebBag</title><h1>缺少 web/index.html</h1>";
                 return;
             }
             String html = new String(in.readAllBytes(), StandardCharsets.UTF_8);
@@ -134,7 +134,7 @@ public final class HttpApiServer {
                     .replace("__LIVE__", String.valueOf(settings.liveUpdate()))
                     .replace("__ALLOW_ENDER__", String.valueOf(settings.allowEnderChest()));
         } catch (IOException e) {
-            plugin.getLogger().severe("Failed to load web/index.html: " + e.getMessage());
+            plugin.getLogger().severe("读取 web/index.html 失败: " + e.getMessage());
         }
     }
 
@@ -229,7 +229,7 @@ public final class HttpApiServer {
             respondJson(exchange, 504, errorJson("timeout", "读取背包超时，请稍后重试。"));
             return;
         } catch (Exception e) {
-            plugin.getLogger().warning("Failed to build inventory snapshot: " + e);
+            plugin.getLogger().warning("生成背包快照失败: " + e);
             respondJson(exchange, 500, errorJson("internal_error", "生成背包数据失败。"));
             return;
         }
@@ -441,7 +441,7 @@ public final class HttpApiServer {
         } catch (IOException ignored) {
             // 浏览器关闭页面 / 网络断开
         } catch (Exception e) {
-            plugin.getLogger().warning("Live stream closed: " + e.getMessage());
+            plugin.getLogger().warning("实时推送连接断开: " + e.getMessage());
         } finally {
             streamSlots.release();
             try {
@@ -552,7 +552,7 @@ public final class HttpApiServer {
         } catch (TimeoutException e) {
             respondJson(exchange, 504, errorJson("timeout", "服务器主线程繁忙，请稍后重试。"));
         } catch (Exception e) {
-            plugin.getLogger().warning("Failed to build response: " + e);
+            plugin.getLogger().warning("生成响应失败: " + e);
             respondJson(exchange, 500, errorJson("internal_error", "数据生成失败。"));
         }
     }
@@ -567,12 +567,12 @@ public final class HttpApiServer {
                     .build();
             HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
             if (response.statusCode() == 200 && !response.body().isBlank()) {
-                plugin.getLogger().info("Cached zh_cn language file (" + response.body().length() + " bytes).");
+                plugin.getLogger().info("已缓存 zh_cn 语言文件（" + response.body().length() + " 字节）");
                 return response.body();
             }
-            plugin.getLogger().warning("Language file returned status " + response.statusCode() + ": " + url);
+            plugin.getLogger().warning("语言文件返回状态码 " + response.statusCode() + ": " + url);
         } catch (Exception e) {
-            plugin.getLogger().warning("Failed to fetch language file: " + e.getMessage());
+            plugin.getLogger().warning("获取语言文件失败: " + e.getMessage());
         }
         return null;
     }

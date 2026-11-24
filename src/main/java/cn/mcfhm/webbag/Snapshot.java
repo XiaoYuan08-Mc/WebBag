@@ -63,7 +63,7 @@ final class Snapshot {
         return json.toString();
     }
 
-    /** 管理指令 selftest 用：不依赖在线玩家，验证 JSON 生成链路。 */
+    /** 管理指令 selftest 用：不依赖在线玩家，验证 JSON 生成流程。 */
     static String sample() {
         ItemStack sword = new ItemStack(Material.DIAMOND_SWORD);
         ItemMeta meta = sword.getItemMeta();
@@ -163,7 +163,7 @@ final class Snapshot {
         json.endObject();
     }
 
-    /** 老的自定义模型数据没有非过时的读取方式，这里单独收口并抑制告警。 */
+    /** 老的自定义模型数据没有非过时的读取方式，这里单独集中处理并抑制告警。 */
     @SuppressWarnings("deprecation")
     private static Integer customModelData(ItemMeta meta) {
         if (meta == null || !meta.hasCustomModelData()) {

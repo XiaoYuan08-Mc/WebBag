@@ -55,8 +55,8 @@ public final class WebBagPlugin extends JavaPlugin {
         this.http = new HttpApiServer(this, accessKey);
 
         if (http.start()) {
-            getLogger().info("Web inventory dashboard listening on " + settings.bind() + ":" + settings.port());
-            getLogger().info("Run /webbag as an administrator to get the access link.");
+            getLogger().info("网页背包服务已启动: " + settings.bind() + ":" + settings.port());
+            getLogger().info("管理员执行 /webbag 可获取访问链接。");
             // 贴图包在异步线程预热：第一次打开网页时不至于让主线程解压 zip
             Bukkit.getScheduler().runTaskAsynchronously(this, () -> {
                 try {
@@ -66,7 +66,7 @@ public final class WebBagPlugin extends JavaPlugin {
                 }
             });
         } else {
-            getLogger().severe("Failed to start HTTP service. Check port " + settings.port() + " and bind address.");
+            getLogger().severe("网页服务启动失败，请检查端口 " + settings.port() + " 和监听地址。");
         }
     }
 
@@ -91,7 +91,7 @@ public final class WebBagPlugin extends JavaPlugin {
 
         int port = c.getInt("port", 5001);
         if (port < 1 || port > 65535) {
-            getLogger().warning("Invalid port (" + port + "), falling back to 5001.");
+            getLogger().warning("端口不合法（" + port + "），已回退到 5001。");
             port = 5001;
         }
 
@@ -139,7 +139,7 @@ public final class WebBagPlugin extends JavaPlugin {
         String generated = new AccessKey("").generate();
         getConfig().set("access-key", generated);
         saveConfig();
-        getLogger().info("Generated a new access key and saved it to config.yml.");
+        getLogger().info("已生成新的访问口令并写入 config.yml。");
         return generated;
     }
 
@@ -306,7 +306,7 @@ public final class WebBagPlugin extends JavaPlugin {
                 }
             }
         } catch (Exception ignored) {
-            // 使用兜底
+            // 没有可用地址时退回 localhost
         }
         return "localhost";
     }
@@ -381,7 +381,7 @@ public final class WebBagPlugin extends JavaPlugin {
         sender.sendMessage(Component.text("口令已更换，旧链接立即失效。", NamedTextColor.GREEN));
         sender.sendMessage(Component.text("新口令：" + key, NamedTextColor.YELLOW));
         sender.sendMessage(Component.text("新链接：" + dashboardUrl(), NamedTextColor.AQUA));
-        getLogger().info("Access key rotated by " + sender.getName() + ".");
+        getLogger().info("访问口令已更换，操作人 " + sender.getName() + ".");
         return true;
     }
 
@@ -427,13 +427,13 @@ public final class WebBagPlugin extends JavaPlugin {
     private boolean selfTest(CommandSender sender) {
         try {
             String json = Snapshot.sample();
-            getLogger().info("Self-test snapshot: " + json);
+            getLogger().info("自检快照: " + json);
             String coverage = Textures.coverage();
-            getLogger().info("Self-test icon coverage: " + coverage);
+            getLogger().info("自检图标覆盖: " + coverage);
             sender.sendMessage(Component.text("自检通过，JSON 长度 " + json.length() + " 字节。", NamedTextColor.GREEN));
             sender.sendMessage(Component.text("图标覆盖：" + coverage, NamedTextColor.GRAY));
         } catch (Throwable t) {
-            getLogger().severe("Self-test failed: " + t);
+            getLogger().severe("自检失败: " + t);
             sender.sendMessage(Component.text("自检失败：" + t.getMessage(), NamedTextColor.RED));
         }
         return true;
