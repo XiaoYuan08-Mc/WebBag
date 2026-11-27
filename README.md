@@ -77,8 +77,7 @@
 ## 构建
 
 ```powershell
-& 'D:\scoop\apps\gradle\current\bin\gradle.bat' -p 'G:\插件\WebBag' build --console=plain `
-  '-Dorg.gradle.java.installations.paths=D:\mo-jdk\jdk-25.0.5+8'
+.\gradlew.bat build --console=plain
 ```
 
 需要 JDK 25，产物在 `build/libs/`。
